@@ -118,3 +118,8 @@ One entry per session: what I asked for, what the agent produced, what I verifie
   holding a page from before a deploy request old asset hashes, which 404 → blank. Proposed an inline reload-once
   safety net in index.html (not built yet; awaiting OK).
 - Verified / changed: 
+- Bottom buttons hidden behind iOS Safari's toolbar: unpinned the Claim footer ("Your share so far" + Preview) and
+  the Review "Share with the table" block so they sit at the end of the page; app shell now `h-dvh` (100vh on iOS
+  includes the area under the toolbar) + `viewport-fit=cover` + safe-area bottom padding. Checked `h-dvh` actually
+  wins in the built CSS (with `h-screen` alongside it, h-screen won). Logo: added the white receipt lines from
+  logo-mark.svg to `Logo.tsx` (ink lines on the white strip in the dark variant).

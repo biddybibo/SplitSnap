@@ -179,7 +179,7 @@ export function ClaimScreen({ billId }: { billId: string }) {
         })}
       </ul>
 
-      <footer className="sticky bottom-0 flex flex-col gap-2.5 border-t border-border bg-card px-5 pb-5 pt-3.5">
+      <footer className="mt-2 flex flex-col gap-2.5 border-t border-border bg-card px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-3.5">
         <div className="flex items-baseline justify-between gap-3">
           <span className="flex flex-col gap-0.5">
             <span className="text-[13px] text-muted-foreground">Your share so far</span>

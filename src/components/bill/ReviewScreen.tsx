@@ -311,7 +311,7 @@ export function ReviewScreen({ billId }: { billId: string }) {
 
       <div className="flex-1" />
       {isHost && (
-        <div className="sticky bottom-0 -mx-5 flex flex-col gap-2 bg-background/95 px-5 pb-5 pt-3 backdrop-blur">
+        <div className="flex flex-col gap-2 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-3">
           <Button size="lg" className="h-[52px] text-base" disabled={!canShare} onClick={share}>
             {sharing ? 'Opening…' : 'Share with the table'}
           </Button>
