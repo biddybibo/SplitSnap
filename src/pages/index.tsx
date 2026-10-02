@@ -18,7 +18,7 @@
 
 import { Link } from 'react-router-dom'
 import { Seo } from '../components/Seo'
-import { APP_NAME } from '../constants'
+import { Logo } from '../components/Logo'
 import { seo } from '../seo'
 
 export default function Landing() {
@@ -29,7 +29,9 @@ export default function Landing() {
         data-testid="static-landing"
         className="flex min-h-screen flex-col items-center justify-center px-6 text-center"
       >
-        <p className="mb-3 font-display text-lg font-bold tracking-tight text-foreground">{APP_NAME}</p>
+        <div className="mb-5">
+          <Logo size={40} />
+        </div>
         <h1 className="mb-4 max-w-2xl font-display text-4xl font-semibold leading-[1.1] tracking-tight text-foreground sm:text-5xl">
           Snap it. Share it. Everyone picks their own.
         </h1>

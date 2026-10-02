@@ -19,6 +19,7 @@ import { Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Outlet } from 'react-router-dom'
 import { DeepSpaceAuthProvider, useAuthStatus } from 'deepspace'
 import { RecordProvider, RecordScope } from 'deepspace'
+import { Logo } from '../../components/Logo'
 import Navigation from '../../components/Navigation'
 import { useToast } from '@/components/ui'
 import { APP_NAME, SCOPE_ID } from '../../constants'
@@ -90,7 +91,7 @@ function BootScreen() {
   }, [])
   return (
     <div aria-busy="true" className="fixed inset-0 flex flex-col items-center justify-center gap-3 bg-background px-8 text-center">
-      <span className="font-display text-2xl font-bold tracking-tight">{APP_NAME}</span>
+      <Logo size={36} />
       <span className="size-5 animate-spin rounded-full border-2 border-primary border-t-transparent" aria-hidden />
       <span className="text-sm text-muted-foreground">Opening…</span>
       {slow && (

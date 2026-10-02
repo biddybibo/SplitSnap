@@ -108,3 +108,13 @@ One entry per session: what I asked for, what the agent produced, what I verifie
   `src/lib/share.ts`. Did NOT write computeShares: totals show items only, "tax, fees & tip added at lock".
   tsc/lint clean, 58/58 unit, 8/8 runtime. Two-phone claim test pending.
 - Verified / changed: 
+
+## 2026-10-02 — Logo + icons
+- Asked: implement my logo files (favicon.svg, logo-mark.svg, logo-mark-dark.svg, Logo.tsx).
+- Agent produced: favicon.svg as the tab icon; 180px apple-touch-icon.png rendered from it (full-bleed; iMessage was
+  requesting it and getting nothing); both marks in public/; `src/components/Logo.tsx` (as given, wordmark font
+  switched to the `--font-display` token, same Space Grotesk with fallbacks) used in the nav, landing and the
+  "Opening…" screen; theme-color meta. 390px screenshots checked. Also diagnosed the blank-screen reports: tabs
+  holding a page from before a deploy request old asset hashes, which 404 → blank. Proposed an inline reload-once
+  safety net in index.html (not built yet; awaiting OK).
+- Verified / changed: 
