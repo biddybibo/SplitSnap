@@ -18,6 +18,11 @@
 
 export const THEMES = [
   {
+    id: 'receipt',
+    label: 'Receipt',
+    description: "SplitSnap's theme: warm receipt-paper white, ink text, money green.",
+  },
+  {
     id: 'slate',
     label: 'Slate',
     description: 'Neutral dark placeholder default. Replace with your own theme.',

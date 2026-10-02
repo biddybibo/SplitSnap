@@ -48,3 +48,13 @@ One entry per session: what I asked for, what the agent produced, what I verifie
   correctly. Bug found: 18% service charge saved as an item, so both checks falsely failed. Fix: `fees[]` in the
   AI schema, `fee` item kind (split by subtotal like tax), check = subtotal + fees + tax + tip. Test case #3 added.
   Re-test after fix (Westin, 3.4 s): service charge saved as `fee`; both checks true, offByCents 0. Slice 2 verified e2e.
+
+## 2026-10-02 — Slice 3a: start screen + theme (checkpoint)
+- Asked: slice 3, stopping after the start screen for a phone check.
+- Agent produced: `/home` start screen (snap / upload; signed-out → sign in; preview + "Reading the receipt…" via
+  `useAsyncResource` with retry 0 since each attempt costs a parse; error + Try again / Different photo; navigates to
+  the bill) and "Your bills" list; photo saved with `useR2Files().uploadBase64` (self scope), non-fatal if it fails;
+  `/b/<billId>` stub that reads the bill room; helpers `src/lib/{image,actions,money}.ts`; "receipt" theme (warm
+  white, ink, money green) as default; landing + SEO copy; APP_NAME → "SplitSnap"; deleted `/spike`.
+  tsc/lint clean, 17/17 unit, 8/8 runtime; checked 390px screenshots of landing and signed-out home.
+- Verified / changed: 

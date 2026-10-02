@@ -16,6 +16,35 @@
  *   4. Switch to it via `data-theme` on <html> in index.html.
  */
 
+/* Receipt — SplitSnap's theme: receipt-paper warm white, ink text, money green. */
+[data-theme="receipt"] {
+  color-scheme: light;
+  --color-background: #faf7f2;
+  --color-foreground: #1c1917;
+  --color-card: #ffffff;
+  --color-card-foreground: #1c1917;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #1c1917;
+  --color-primary: #166534;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #f1ece4;
+  --color-secondary-foreground: #1c1917;
+  --color-muted: #f1ece4;
+  --color-muted-foreground: #6b635a;
+  --color-accent: #eae3d8;
+  --color-accent-foreground: #1c1917;
+  --color-destructive: #b91c1c;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #e4dcd0;
+  --color-input: #dcd3c5;
+  --color-ring: #166534;
+  --radius: 0.75rem;
+  --shadow-card: 0 1px 2px 0 rgba(28, 25, 23, 0.04);
+  --shadow-card-hover: 0 2px 8px 0 rgba(28, 25, 23, 0.06);
+  --color-shell: #f4efe7;
+  --color-shell-panel: #ffffff;
+}
+
 /* Paper — light example theme; shows the full token contract incl.
  * `color-scheme: light`. Replace or delete it once the app has its own. */
 [data-theme="paper"] {
