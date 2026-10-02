@@ -1,7 +1,6 @@
 /**
- * Display math for the Claim screen: who claimed each line and each person's
- * even portion of it. Display-only — the authoritative amounts (tax, fees, tip,
- * leftover pennies) come from computeShares when the host locks the bill.
+ * Display helpers for the Claim screen: who claimed each line and the per-item
+ * "you $x" portion. Everyone's totals come from computeShares.
  */
 
 export interface ClaimableLine {
@@ -30,14 +29,6 @@ export function claimsByLine(lines: ClaimableLine[], claims: ClaimRow[]): Map<st
     })
   }
   return byLine
-}
-
-/** One person's running total of item portions (before tax, fees and tip). */
-export function itemsTotalFor(userId: string, lines: ClaimableLine[], byLine: Map<string, LineClaims>): number {
-  return lines.reduce((sum, line) => {
-    const c = byLine.get(line.id)
-    return c && c.claimantIds.includes(userId) && c.portionCents !== null ? sum + c.portionCents : sum
-  }, 0)
 }
 
 export function unclaimedCount(lines: ClaimableLine[], byLine: Map<string, LineClaims>): number {

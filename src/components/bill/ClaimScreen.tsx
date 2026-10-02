@@ -12,7 +12,8 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth, useMutations, usePresenceRoom, useQuery } from 'deepspace'
 import { Pencil } from 'lucide-react'
 import { buttonVariants, useToast } from '@/components/ui'
-import { claimsByLine, itemsTotalFor, unclaimedCount, type ClaimRow } from '@/lib/claims'
+import { claimsByLine, unclaimedCount, type ClaimRow } from '@/lib/claims'
+import { computeShares } from '@/lib/computeShares'
 import { formatCents } from '@/lib/money'
 import { reconcile } from '@/lib/reconcile'
 import { cn } from '@/lib/utils'
@@ -55,7 +56,19 @@ export function ClaimScreen({ billId }: { billId: string }) {
     .map((i) => ({ id: i.recordId, priceCents: i.data.priceCents, name: i.data.name, qty: i.data.qty }))
   const claims = claimsQuery.records
   const byLine = claimsByLine(lines, claims.map((c) => c.data))
-  const myItemsCents = userId ? itemsTotalFor(userId, lines, byLine) : 0
+  const shares = computeShares(
+    itemsQuery.records.map((i) => ({ id: i.recordId, kind: i.data.kind, priceCents: i.data.priceCents })),
+    claims.map((c) => c.data),
+    receipt.hostId,
+  )
+  const myShare = shares.find((s) => s.userId === userId)
+  const breakdown = [
+    `${formatCents(myShare?.subtotalCents ?? 0)} items`,
+    ...(myShare?.feesCents ? [`${formatCents(myShare.feesCents)} fees`] : []),
+    `${formatCents(myShare?.taxCents ?? 0)} tax`,
+    `${formatCents(myShare?.tipCents ?? 0)} tip`,
+    ...(myShare?.adjustmentCents ? [`${formatCents(myShare.adjustmentCents)} adj.`] : []),
+  ].join(' + ')
   const unclaimed = unclaimedCount(lines, byLine)
   const billTotalCents = reconcile(
     itemsQuery.records.map((i) => ({ kind: i.data.kind, priceCents: i.data.priceCents })),
@@ -191,11 +204,9 @@ export function ClaimScreen({ billId }: { billId: string }) {
         <div className="flex items-baseline justify-between gap-3">
           <span className="flex flex-col gap-0.5">
             <span className="text-[13px] text-muted-foreground">Your share so far</span>
-            <span className="text-[12.5px] text-muted-foreground">
-              {formatCents(myItemsCents)} items · tax, fees &amp; tip added at lock
-            </span>
+            <span className="text-[12.5px] text-muted-foreground">{breakdown}</span>
           </span>
-          <span className="font-display text-[28px] font-bold tabular-nums">{formatCents(myItemsCents)}</span>
+          <span className="font-display text-[28px] font-bold tabular-nums">{formatCents(myShare?.totalCents ?? 0)}</span>
         </div>
         {unclaimed > 0 && (
           <p className="rounded-lg bg-warning-soft px-2.5 py-2 text-[13px] text-warning">

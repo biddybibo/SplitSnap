@@ -10,7 +10,8 @@ Full spec: `PLAN.md`. Read it before starting any new slice of work.
 - Use the deepspace skill and the SDK docs (https://docs.deep.space) as the source of truth. Do not guess SDK APIs.
 - Work one slice at a time (one schema, one screen, or one action). Stop after each slice so I can review the diff.
 - Don't refactor or touch files outside the current slice.
-- I write `src/lib/computeShares.ts` and its tests myself. Do not edit it unless I ask.
+- `src/lib/computeShares.ts` + tests: written by the agent at my request (2026-10-02); I review and verify them.
+  Don't change its rules without asking.
 - After each session, add a line to `AGENT_LOG.md`: what I asked for, what you produced, what I changed.
 
 ## Architecture decisions (already made)

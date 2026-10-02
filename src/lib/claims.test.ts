@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { claimsByLine, itemsTotalFor, unclaimedCount } from './claims'
+import { claimsByLine, unclaimedCount } from './claims'
 
 const lines = [
   { id: 'pastor', priceCents: 1325 },
@@ -23,12 +23,6 @@ describe('claim display math', () => {
     expect(byLine.get('pastor')).toEqual({ claimantIds: ['roy', 'maya'], portionCents: 663 })
     expect(byLine.get('churros')?.portionCents).toBe(233)
     expect(byLine.get('jarritos')).toEqual({ claimantIds: [], portionCents: null })
-  })
-
-  it("totals one person's portions", () => {
-    expect(itemsTotalFor('roy', lines, byLine)).toBe(663 + 600 + 233)
-    expect(itemsTotalFor('dev', lines, byLine)).toBe(233)
-    expect(itemsTotalFor('nobody', lines, byLine)).toBe(0)
   })
 
   it('counts unclaimed lines', () => {

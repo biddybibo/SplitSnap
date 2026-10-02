@@ -138,8 +138,8 @@ If a day slips: cut nudges/cron first, then guests, then presence. Never cut bre
 Playwright scaffolding.
 
 **I do or verify myself:**
-- [ ] Write `computeShares` + unit tests (rounding, shared items, zero tip, discount lines, adjustment lines,
-      fee lines, guest claimants, pennies sum to total)
+- [ ] Review the agent-written `computeShares` + unit tests (rounding, shared items, zero tip, discount lines,
+      adjustment lines, fee lines, guest claimants, pennies sum to total) and check its numbers by hand
 - [ ] Review every permissions block and `userBound`/`uniqueOn` line against this plan
 - [ ] Run the break-it tests on the deployed URL
 - [ ] Run the core path on two real phones with two accounts

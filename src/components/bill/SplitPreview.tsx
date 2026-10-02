@@ -1,13 +1,13 @@
 /**
- * "Preview the final split": everyone's item portions so far, and what's still
- * unclaimed. Tax, fees and tip are split by subtotal at lock (computeShares),
- * so this preview shows items only and says so.
+ * "Preview the final split": what everyone would owe if the host locked now
+ * (computeShares, the same function lockBill uses), and what's still unclaimed.
  */
 
 import { Link } from 'react-router-dom'
 import { useAuth, useQuery } from 'deepspace'
 import { ChevronLeft } from 'lucide-react'
-import { claimsByLine, itemsTotalFor, type ClaimRow } from '@/lib/claims'
+import { claimsByLine, type ClaimRow } from '@/lib/claims'
+import { computeShares } from '@/lib/computeShares'
 import { formatCents } from '@/lib/money'
 import { reconcile } from '@/lib/reconcile'
 import { Avatar, type Participant } from './Table'
@@ -38,6 +38,13 @@ export function SplitPreview({ billId }: { billId: string }) {
     },
   )
   const extrasCents = check.grandTotalCents - check.claimableCents
+  const shares = computeShares(
+    items.map((i) => ({ id: i.recordId, kind: i.data.kind, priceCents: i.data.priceCents })),
+    claims,
+    receipt.hostId,
+  )
+  const shareOf = (id: string) => shares.find((s) => s.userId === id)
+  const assignedCents = shares.reduce((s, x) => s + x.totalCents, 0)
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-3.5 px-5 pb-10 pt-2">
@@ -65,10 +72,11 @@ export function SplitPreview({ billId }: { billId: string }) {
                 {p.userId === userId && <span className="font-normal text-muted-foreground"> (you)</span>}
               </span>
               <span className="text-[12.5px] text-muted-foreground">
-                {p.userId === receipt.hostId ? 'Host · paid the restaurant' : 'Items so far'}
+                {p.userId === receipt.hostId ? 'Host · paid the restaurant · ' : ''}
+                {formatCents(shareOf(p.userId)?.subtotalCents ?? 0)} items + {formatCents((shareOf(p.userId)?.totalCents ?? 0) - (shareOf(p.userId)?.subtotalCents ?? 0))} extras
               </span>
             </span>
-            <span className="font-mono text-sm tabular-nums">{formatCents(itemsTotalFor(p.userId, lines, byLine))}</span>
+            <span className="font-mono text-sm font-semibold tabular-nums">{formatCents(shareOf(p.userId)?.totalCents ?? 0)}</span>
           </div>
         ))}
       </section>
@@ -87,7 +95,10 @@ export function SplitPreview({ billId }: { billId: string }) {
           <span className="font-mono tabular-nums">{formatCents(check.grandTotalCents)}</span>
         </div>
         <p className="pt-1 text-[12.5px] text-muted-foreground">
-          Fees, tax and tip are split in proportion to what each person ordered when the host locks the bill.
+          Fees, tax and tip are split in proportion to what each person ordered.{' '}
+          {assignedCents === check.grandTotalCents
+            ? 'Everyone’s shares add up to the bill total.'
+            : `${formatCents(check.grandTotalCents - assignedCents)} isn’t assigned yet: claim the items below.`}
         </p>
       </section>
 

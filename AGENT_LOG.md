@@ -134,3 +134,14 @@ One entry per session: what I asked for, what the agent produced, what I verifie
   built) and "1 link · Not opened" (needs invite tracking). Removed `src/lib/share.ts`. npm audit's one low finding
   is the pre-existing esbuild dev-server (Windows) issue, not qrcode.
 - Verified / changed: 
+
+## 2026-10-02 — computeShares (written by the agent at my request)
+- Asked: write computeShares + tests for me (CLAUDE.md rule updated to record it; I review and verify).
+- Agent produced: `src/lib/computeShares.ts` — exact BigInt fractions; item/discount split evenly among claimants;
+  fee/tax/tip/adjustment each split by subtotal share of the whole food subtotal; non-hosts rounded to the nearest
+  cent per category, host takes the remainder (reproduces PLAN's sample: Roy $33.39, Maya $26.28, Dev $15.30);
+  unclaimed lines not assigned in previews; extras to host when the food subtotal ≤ 0; rejects non-integer cents.
+  14 tests incl. a 2,000-bill randomized check (sums exactly; non-hosts within ½¢ per category). Mutation check:
+  rounding down instead of nearest fails 2 tests. Wired into the claim panel breakdown and the split preview;
+  removed the items-only helper. 71/71 unit, 8/8 runtime.
+- Verified / changed: 
