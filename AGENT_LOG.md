@@ -96,3 +96,15 @@ One entry per session: what I asked for, what the agent produced, what I verifie
   link. Fix: `src/lib/returnTo.ts` remembers `/b/<uuid>` (only that shape; 10-min expiry) and /home sends them
   back; tests cover open-redirect attempts. Also replaced the blank auth-check screen with a branded "Opening…"
   screen that suggests Safari/Chrome or a connection check after 5 s. 55/55 unit, 8/8 runtime.
+
+## 2026-10-02 — Slice 4b: claim screen (from the mockup)
+- Asked: the tap-what-you-had screen for guests and host, with Invite and "Preview the final split".
+- Agent produced: `ClaimScreen` (mockup layout: header + Invite for everyone, Edit for host, avatar stack + live
+  "N here · X still picking" via `usePresenceRoom('bill:<id>')`, tap-to-claim cards with claimant avatars,
+  "Split N ways" / "Nobody yet", "you $x", sticky "Your share so far" + unclaimed warning + Preview button; Join card
+  on top for friends not yet seated; claims via createConfirmed/removeConfirmed with per-item pending lock);
+  `SplitPreview` (per-person item portions, fees/tax/tip total, unclaimed list); bill-page router (host reviews until
+  first share, then everyone claims; `?edit=1`, `?view=split`); `src/lib/claims.ts` display math + tests;
+  `src/lib/share.ts`. Did NOT write computeShares: totals show items only, "tax, fees & tip added at lock".
+  tsc/lint clean, 58/58 unit, 8/8 runtime. Two-phone claim test pending.
+- Verified / changed: 

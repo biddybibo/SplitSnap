@@ -1,4 +1,4 @@
-/** Who's at the table: avatars, the join card, and the participants list. */
+/** Who's at the table: avatars and the join card. */
 
 import { useState } from 'react'
 import { useDisplayName } from 'deepspace'
@@ -85,28 +85,5 @@ export function JoinCard({ billId, hostName }: { billId: string; hostName: strin
         {busy ? 'Joining…' : 'Join the table'}
       </Button>
     </form>
-  )
-}
-
-export function WhoIsHere({ people, hostId, meId }: { people: Participant[]; hostId: string; meId: string | null }) {
-  if (people.length === 0) return null
-  return (
-    <section className="flex flex-col gap-2">
-      <h2 className="text-[13px] font-semibold uppercase tracking-[0.6px] text-muted-foreground">
-        At the table · {people.length}
-      </h2>
-      <ul className="flex flex-col rounded-xl border border-border bg-card px-3.5">
-        {people.map((p) => (
-          <li key={p.userId} className="flex items-center gap-2.5 border-b border-muted py-2.5 last:border-b-0">
-            <Avatar id={p.userId} name={p.displayName} size={30} />
-            <span className="font-medium">
-              {p.displayName}
-              {p.userId === meId && <span className="font-normal text-muted-foreground"> (you)</span>}
-            </span>
-            {p.userId === hostId && <span className="ml-auto text-[12.5px] text-muted-foreground">Host</span>}
-          </li>
-        ))}
-      </ul>
-    </section>
   )
 }

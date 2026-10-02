@@ -16,32 +16,11 @@ import { Button, useToast } from '@/components/ui'
 import { callAction } from '@/lib/actions'
 import { formatCents, parseDollars } from '@/lib/money'
 import { reconcile, tipForPercent, type LineKind } from '@/lib/reconcile'
+import { shareBillLink } from '@/lib/share'
 import { cn } from '@/lib/utils'
 import { HandleField, MoneyField, TextField } from './fields'
-import { JoinCard, WhoIsHere, type Participant } from './Table'
-
-interface Item {
-  name: string
-  qty: number
-  priceCents: number
-  kind: LineKind
-  hostId: string
-}
-
-interface ReceiptRow {
-  merchant: string
-  printedSubtotalCents: number | null
-  printedTotalCents: number
-  printedTipCents?: number
-  chargedCents?: number | null
-  receiptNumber?: string
-  printedAt?: string
-  imageId?: string
-  payVenmo?: string
-  payCashApp?: string
-  payPaypal?: string
-  hostId: string
-}
+import type { Participant } from './Table'
+import type { Item, ReceiptRow } from './types'
 
 const TIP_PERCENTS = [15, 18, 20, 22]
 
@@ -129,9 +108,7 @@ export function ReviewScreen({ billId }: { billId: string }) {
   }
 
   const itemCount = claimable.filter((i) => i.data.kind === 'item').length
-  const people = participantsQuery.records.map((p) => p.data)
-  const me = people.find((p) => p.userId === userId)
-  const hostName = people.find((p) => p.userId === receipt.hostId)?.displayName ?? 'Your host'
+  const me = participantsQuery.records.find((p) => p.data.userId === userId)
   const hasPayHandle = Boolean(receipt.payVenmo || receipt.payCashApp || receipt.payPaypal)
   const canShare = canEdit && check.reconciled && hasPayHandle && !sharing
   const shareHint = !check.reconciled
@@ -145,17 +122,8 @@ export function ReviewScreen({ billId }: { billId: string }) {
     try {
       // The host takes their own seat the first time they share.
       if (!me) await callAction('joinBill', { billId, displayName: (myName ?? 'Host').split(' ')[0] })
-      const url = `${window.location.origin}/b/${billId}`
-      const text = `Split ${receipt.merchant} with me on SplitSnap. Tap what you had.`
-      if (navigator.share) {
-        try {
-          await navigator.share({ title: 'SplitSnap', text, url })
-        } catch (err) {
-          if (err instanceof DOMException && err.name === 'AbortError') return // closed the share sheet
-          throw err
-        }
-      } else {
-        await navigator.clipboard.writeText(url)
+      // Once the host has a seat, the bill page switches them to the claim screen.
+      if ((await shareBillLink(billId, receipt.merchant)) === 'copied') {
         toast.success('Link copied', 'Paste it in your group chat.')
       }
     } catch (err) {
@@ -169,8 +137,8 @@ export function ReviewScreen({ billId }: { billId: string }) {
     <div className="mx-auto flex min-h-full w-full max-w-md flex-col gap-3.5 px-5 pt-2">
       <header className="flex items-center gap-2">
         <Link
-          to="/home"
-          aria-label="Back to your bills"
+          to={me ? `/b/${billId}` : '/home'}
+          aria-label={me ? 'Back to the table' : 'Back to your bills'}
           className="-ml-2.5 flex size-11 items-center justify-center rounded-full hover:bg-accent"
         >
           <ChevronLeft className="size-[22px]" />
@@ -215,13 +183,7 @@ export function ReviewScreen({ billId }: { billId: string }) {
       </section>
       {photoOpen && receipt.imageId && <PhotoFull imageId={receipt.imageId} onClose={() => setPhotoOpen(false)} />}
 
-      {!isHost && !me && participantsQuery.status === 'ready' && <JoinCard billId={billId} hostName={hostName} />}
-      {!isHost && me && (
-        <p className="text-sm text-muted-foreground">
-          You&apos;re at the table. Claiming your items opens here next.
-        </p>
-      )}
-      {(me || isHost) && <WhoIsHere people={people} hostId={receipt.hostId} meId={userId} />}
+
 
       {/* Items */}
       <section className={cn(card, 'flex flex-col px-3.5 py-1')}>
