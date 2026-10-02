@@ -11,7 +11,8 @@ import { useCallback, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth, useMutations, usePresenceRoom, useQuery } from 'deepspace'
 import { Pencil } from 'lucide-react'
-import { buttonVariants, useToast } from '@/components/ui'
+import { Button, ConfirmModal, buttonVariants, useToast } from '@/components/ui'
+import { callAction } from '@/lib/actions'
 import { claimsByLine, unclaimedCount, type ClaimRow } from '@/lib/claims'
 import { computeShares } from '@/lib/computeShares'
 import { formatCents } from '@/lib/money'
@@ -34,6 +35,8 @@ export function ClaimScreen({ billId }: { billId: string }) {
   // `?invite=1` (the host's first share from the review screen) opens the sheet on arrival.
   const [params, setParams] = useSearchParams()
   const [inviteOpen, setInviteOpen] = useState(params.get('invite') === '1')
+  const [confirmLock, setConfirmLock] = useState(false)
+  const [locking, setLocking] = useState(false)
   const closeInvite = useCallback(() => {
     setInviteOpen(false)
     if (params.has('invite')) setParams({}, { replace: true })
@@ -70,7 +73,7 @@ export function ClaimScreen({ billId }: { billId: string }) {
     ...(myShare?.adjustmentCents ? [`${formatCents(myShare.adjustmentCents)} adj.`] : []),
   ].join(' + ')
   const unclaimed = unclaimedCount(lines, byLine)
-  const billTotalCents = reconcile(
+  const billCheck = reconcile(
     itemsQuery.records.map((i) => ({ kind: i.data.kind, priceCents: i.data.priceCents })),
     {
       printedSubtotalCents: receipt.printedSubtotalCents ?? null,
@@ -78,7 +81,27 @@ export function ClaimScreen({ billId }: { billId: string }) {
       printedTipCents: receipt.printedTipCents ?? 0,
       chargedCents: receipt.chargedCents ?? null,
     },
-  ).grandTotalCents
+  )
+  const billTotalCents = billCheck.grandTotalCents
+  const canLock = isHost && unclaimed === 0 && billCheck.reconciled && lines.length > 0
+  const lockHint = !billCheck.reconciled
+    ? 'The receipt doesn’t add up yet. Tap Edit to fix it.'
+    : unclaimed > 0
+      ? null // the unclaimed warning above already says why
+      : 'Everything’s claimed. Locking makes the totals final.'
+
+  async function lock() {
+    setLocking(true)
+    try {
+      await callAction('lockBill', { billId })
+      // The bill page switches everyone to the settle screen when lockedAt lands.
+    } catch (err) {
+      toast.error("Couldn't lock the bill", err instanceof Error ? err.message : undefined)
+    } finally {
+      setLocking(false)
+      setConfirmLock(false)
+    }
+  }
 
   // Presence: who has the bill open right now, and who's here but hasn't tapped anything.
   const hereIds = new Set([...(userId ? [userId] : []), ...peers.map((p) => p.userId)])
@@ -214,13 +237,36 @@ export function ClaimScreen({ billId }: { billId: string }) {
             lock the bill yet.
           </p>
         )}
+        {isHost && (
+          <>
+            <Button size="lg" className="h-12 text-base" disabled={!canLock || locking} onClick={() => setConfirmLock(true)}>
+              {locking ? 'Locking…' : 'Lock the bill'}
+            </Button>
+            {lockHint && <p className="-mt-1 text-center text-[12.5px] text-muted-foreground">{lockHint}</p>}
+          </>
+        )}
         <Link
           to={`/b/${billId}?view=split`}
-          className={cn(buttonVariants({ size: 'lg' }), 'h-12 bg-foreground text-base text-background hover:bg-foreground/90')}
+          className={cn(
+            buttonVariants({ size: 'lg', variant: isHost ? 'outline' : 'default' }),
+            'h-12 text-base',
+            !isHost && 'bg-foreground text-background hover:bg-foreground/90',
+          )}
         >
           Preview the final split
         </Link>
       </footer>
+
+      <ConfirmModal
+        open={confirmLock}
+        onClose={() => setConfirmLock(false)}
+        onConfirm={lock}
+        loading={locking}
+        variant="default"
+        title="Lock the bill?"
+        description={`Totals become final and everyone sees what they owe you. You can't edit prices or claims after this. Bill total: ${formatCents(billTotalCents)}.`}
+        confirmText="Lock and send totals"
+      />
 
       {inviteOpen && (
         <InviteSheet

@@ -5,12 +5,14 @@
  * Which screen: the host reviews the receipt until they first share (sharing
  * gives them a participants row), then everyone, host included, claims.
  * `?edit=1` takes the host back to the review; `?view=split` is the preview.
+ * Once lockBill stamps `receipt.lockedAt`, everyone sees the settle screen.
  */
 
 import { RecordScope, useAuth, useQuery } from 'deepspace'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { ClaimScreen } from '@/components/bill/ClaimScreen'
 import { ReviewScreen } from '@/components/bill/ReviewScreen'
+import { SettleScreen } from '@/components/bill/SettleScreen'
 import { SplitPreview } from '@/components/bill/SplitPreview'
 import type { Participant } from '@/components/bill/Table'
 import type { ReceiptRow } from '@/components/bill/types'
@@ -19,13 +21,14 @@ import {
   itemsSchema,
   participantsSchema,
   receiptSchema,
+  sharesSchema,
 } from '../../../../schemas/bill-room-schemas'
 
 export default function BillPage() {
   const { billId } = useParams()
   if (!billId) return null
   return (
-    <RecordScope roomId={`bill:${billId}`} schemas={[receiptSchema, itemsSchema, participantsSchema, claimsSchema]} isolated>
+    <RecordScope roomId={`bill:${billId}`} schemas={[receiptSchema, itemsSchema, participantsSchema, claimsSchema, sharesSchema]} isolated>
       <BillRouter billId={billId} />
     </RecordScope>
   )
@@ -47,6 +50,8 @@ function BillRouter({ billId }: { billId: string }) {
   const isHost = receipt.hostId === userId
   const hostSeated = participantsQuery.records.some((p) => p.data.userId === receipt.hostId)
 
+  // Locked: everyone settles up; nothing can be edited or claimed any more.
+  if (receipt.lockedAt) return <SettleScreen />
   if (params.get('view') === 'split') return <SplitPreview billId={billId} />
   if (isHost && (!hostSeated || params.get('edit') === '1')) return <ReviewScreen billId={billId} />
   return <ClaimScreen billId={billId} />

@@ -145,3 +145,15 @@ One entry per session: what I asked for, what the agent produced, what I verifie
   rounding down instead of nearest fails 2 tests. Wired into the claim panel breakdown and the split preview;
   removed the items-only helper. 71/71 unit, 8/8 runtime.
 - Verified / changed: 
+
+## 2026-10-02 — lockBill + Settle screen
+- Asked: next core step (lock and settle); also scoped my three expansion ideas (card roulette = lighthearted only,
+  no gambling; work-meal light; restaurants writeup-only) into PLAN.md.
+- Agent produced: `lockBill` (host-only via bills.hostId; refuses if already locked, any item unclaimed, offBy ≠ 0
+  or the card charge doesn't match; merges claims + guestClaims; computeShares server-side; refuses if shares ≠ bill
+  total; writes shares keyed by person (idempotent), stamps receipt.lockedAt (not host-writable), marks bills
+  locked). Host "Lock the bill" on the claim screen with a confirm dialog; locked bills route everyone to
+  `SettleScreen` (mockup: "You owe Maya $X", breakdown, Venmo / Cash App / PayPal prefilled via `src/lib/payLinks.ts`,
+  "I paid" toggle on own participants row, the table with Paid / Not paid yet). payLinks rejects unsafe handles
+  (tests). Pay-link URL formats need a real-phone check. 75/75 unit, 8/8 runtime.
+- Verified / changed: 

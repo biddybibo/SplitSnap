@@ -49,6 +49,8 @@ export const receiptSchema: CollectionSchema = {
     { name: 'payVenmo', storage: 'text', interpretation: 'plain' },
     { name: 'payCashApp', storage: 'text', interpretation: 'plain' },
     { name: 'payPaypal', storage: 'text', interpretation: 'plain' },
+    // Set by lockBill only (not in RECEIPT_HOST_FIELDS), so no client can lock or unlock a bill.
+    { name: 'lockedAt', storage: 'text', interpretation: 'plain' },
     { name: 'hostId', storage: 'text', interpretation: 'plain', userBound: true, immutable: true },
   ],
   ownerField: 'hostId',

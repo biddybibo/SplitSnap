@@ -20,5 +20,16 @@ export interface ReceiptRow {
   payVenmo?: string
   payCashApp?: string
   payPaypal?: string
+  lockedAt?: string
   hostId: string
+}
+
+export interface ShareRow {
+  userId: string
+  subtotalCents: number
+  feesCents: number
+  taxCents: number
+  tipCents: number
+  adjustmentCents: number
+  totalCents: number
 }

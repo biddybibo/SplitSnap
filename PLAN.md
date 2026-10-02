@@ -20,11 +20,25 @@ date + check number, then date/time + total, then total + line prices within 7 d
 receipt — open it / start new anyway") and host-only bill deletion; email nudges to unpaid people, a daily reminder job,
 a "who's still picking" indicator.
 
+**Stretch, after the core path works (in this order):**
+1. *Card roulette* — a lighthearted game to pick who covers the whole bill. Everyone opts in on their own phone; the
+   host starts the draw; a server action picks with secure randomness and saves the result where no one can edit it;
+   every phone sees the reveal live. Optional "weighted by what you ordered" mode. The loser owes the host the bill
+   total; everyone else owes $0. No wagering, side bets or stakes beyond the bill itself.
+2. *Work-meal mode (light)* — host sets a simple policy ("company covers food up to $X a head; alcohol is
+   personal"); the AI flags alcohol lines (host can correct); a pure function on top of computeShares splits each
+   share into business vs personal; Settle shows "Company covers $X · You pay $Y" plus a copyable per-person summary.
+   No expense-system integrations (Expensify, Ramp, Brex, Concur).
+
+**Writeup only (future directions):** pay-at-the-table for restaurants (QR on the receipt, diners pay the restaurant,
+check closes itself) — needs payment processing and POS integrations (Toast, Square, Clover); the full work-meal
+product with expense-system export.
+
 **Future (after the deadline):** a "claim your spot" link the host sends a guest through the phone's share sheet;
 the guest signs in and their guest claims convert to normal claims.
 
 **Out of scope, on purpose:** moving money inside the app, multi-currency, item-level discounts beyond a negative
-line, uneven splits of one item, receipt history and analytics, a native mobile app, reading the host's bank
+line, uneven splits of one item, receipt history and analytics, a native mobile app, gambling or wagering of any kind (card roulette only picks who covers the bill), reading the host's bank
 transactions to verify totals (bank-linking means financial-data consent and compliance, and the tipped charge
 usually posts 1–3 days later anyway — the host-entered "amount charged" field covers it).
 
