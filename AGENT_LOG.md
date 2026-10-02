@@ -34,3 +34,13 @@ One entry per session: what I asked for, what the agent produced, what I verifie
   the host's id on a guest participant row); items create false + host-only `addItem` (else a non-host could inject
   lines the host can't delete); `joinBill` needed because members can't write `bills`. Docs updated to match.
 - Verified / changed: 
+
+## 2026-10-02 — Slice 2: real parseReceipt
+- Asked: production parseReceipt; switch to generateText + Output.object.
+- Agent produced: `src/server/action-tools.ts` (tools factory moved out of action-routes.ts, now takes a room id);
+  `parseReceipt` rewritten: input checks, 10/day cap via `usage` (counted before the AI call), subtotal + three-way
+  check (`checkReceipt`, reports lines vs total separately and `offByCents`), writes `receipt` + `items` (tax/tip as
+  kind lines) to `bill:<id>` then the `bills` index row; returns `{ billId, check }`. Unit tests for the check using
+  receipts #1 and #2. Deleted the `/spike` page. tsc/lint clean, 16/16 unit tests.
+  Not yet run end to end (no test accounts; needs the slice 3 upload screen).
+- Verified / changed: 

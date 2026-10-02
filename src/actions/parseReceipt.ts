@@ -1,20 +1,24 @@
 /**
- * SPIKE — throwaway. Proves image → Claude → structured JSON works through
- * createDeepSpaceAI. No usage cap, no records, no R2; the real parseReceipt
- * replaces this once schemas exist.
+ * parseReceipt — photo in, new bill out.
  *
- * Sign-in is enforced by the action route (401 without a verified JWT).
- * No authToken is passed to createDeepSpaceAI, so the app owner is billed.
+ * Signed-in only (the action route refuses a call without a verified JWT).
+ * Owner-billed: no authToken is passed to createDeepSpaceAI, so the cap below
+ * is what protects the owner's credits.
+ *
+ * Writes the bill room (`receipt` + `items`) first and the app-room `bills`
+ * index row last, so the index never points at an empty bill.
  */
 
 import type { ActionHandler } from 'deepspace/worker'
 import { createDeepSpaceAI } from 'deepspace/worker'
-import { generateObject } from 'ai'
+import { generateText, Output } from 'ai'
 import { z } from 'zod'
+import { createActionTools } from '../server/action-tools'
 import type { Env } from '../../worker'
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const DAILY_PARSE_LIMIT = 10
 
 const receiptSchema = z.object({
   merchant: z.string(),
@@ -22,16 +26,48 @@ const receiptSchema = z.object({
     z.object({
       name: z.string(),
       qty: z.number().int(),
-      priceCents: z.number().int().describe('Line total in cents for this row (qty already applied)'),
+      priceCents: z.number().int().describe('Line total in cents as printed (qty already applied); negative for discounts'),
     }),
   ),
+  subtotalCents: z.number().int().nullable().describe('Printed subtotal, or null if the receipt prints none'),
   taxCents: z.number().int(),
   tipCents: z.number().int(),
   totalCents: z.number().int(),
 })
 
-export const parseReceipt: ActionHandler<Env> = async ({ params, env }) => {
-  const { imageBase64, mimeType } = params
+type ParsedReceipt = z.infer<typeof receiptSchema>
+
+const PROMPT =
+  'Extract this restaurant receipt. All money is integer cents. ' +
+  'One entry per printed line item; priceCents is the line total exactly as printed (qty already applied). ' +
+  'Discounts are items with negative priceCents. Do not include subtotal, tax, tip or total as items. ' +
+  'subtotalCents is the printed subtotal, or null if none is printed. ' +
+  'Use 0 for tax or tip if not printed. totalCents is the final total printed on the receipt. ' +
+  'Copy the numbers as printed even if they do not add up; never correct them.'
+
+/**
+ * Three-way check. Each comparison is reported separately so the review
+ * screen can point at the lines or at the total/tax, not just "something's off".
+ */
+export function checkReceipt(r: ParsedReceipt) {
+  const linesCents = r.items.reduce((sum, i) => sum + i.priceCents, 0)
+  const subtotalForTotal = r.subtotalCents ?? linesCents
+  return {
+    linesCents,
+    // null when the receipt prints no subtotal: nothing to compare the lines against.
+    linesMatchSubtotal: r.subtotalCents === null ? null : linesCents === r.subtotalCents,
+    subtotalPlusTaxTipMatchesTotal: subtotalForTotal + r.taxCents + r.tipCents === r.totalCents,
+    // What lockBill will require: lines + tax + tip (+ adjustments) = printed total.
+    offByCents: r.totalCents - (linesCents + r.taxCents + r.tipCents),
+  }
+}
+
+function utcDay(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+export const parseReceipt: ActionHandler<Env> = async ({ userId, params, tools, env, callerJwt }) => {
+  const { imageBase64, mimeType, imageId } = params
   if (typeof imageBase64 !== 'string' || imageBase64.length === 0) {
     return { success: false, error: 'imageBase64 is required' }
   }
@@ -41,33 +77,81 @@ export const parseReceipt: ActionHandler<Env> = async ({ params, env }) => {
   if (Math.floor((imageBase64.length * 3) / 4) > MAX_IMAGE_BYTES) {
     return { success: false, error: 'Image is larger than 5 MB' }
   }
+  if (imageId !== undefined && (typeof imageId !== 'string' || imageId.length > 200)) {
+    return { success: false, error: 'imageId must be a string' }
+  }
 
-  const ai = createDeepSpaceAI(env, 'anthropic')
+  // Daily cap. Counted before the AI call so failed or abandoned parses still count.
+  const day = utcDay()
+  const usage = await tools.query<{ parses?: number }>('usage', { where: { userId, day }, limit: 1 })
+  if (!usage.success) return { success: false, error: 'Could not check your daily limit; try again' }
+  const used = usage.data.records[0]?.data.parses ?? 0
+  if (used >= DAILY_PARSE_LIMIT) {
+    return { success: false, error: `Daily limit reached (${DAILY_PARSE_LIMIT} receipts). Try again tomorrow.` }
+  }
+  const counted = await tools.create('usage', { userId, day, parses: used + 1 }, `${userId}:${day}`)
+  if (!counted.success) return { success: false, error: 'Could not check your daily limit; try again' }
+
+  let parsed: ParsedReceipt
   try {
-    const { object } = await generateObject({
+    const ai = createDeepSpaceAI(env, 'anthropic')
+    const { output } = await generateText({
       model: ai('claude-sonnet-5'),
-      schema: receiptSchema,
+      output: Output.object({ schema: receiptSchema }),
       maxOutputTokens: 4000,
       messages: [
         {
           role: 'user',
           content: [
             { type: 'image', image: imageBase64, mediaType: mimeType },
-            {
-              type: 'text',
-              text:
-                'Extract this restaurant receipt. All money is integer cents. ' +
-                'One entry per printed line item; priceCents is the line total as printed. ' +
-                'Discounts are items with negative priceCents. Do not include subtotal, tax, ' +
-                'tip or total as items. Use 0 for tax or tip if not printed. ' +
-                'totalCents is the final total printed on the receipt.',
-            },
+            { type: 'text', text: PROMPT },
           ],
         },
       ],
     })
-    return { success: true, data: object }
+    parsed = output
   } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : 'Parse failed' }
+    console.error('[parseReceipt] AI call failed', err instanceof Error ? err.message : err)
+    return { success: false, error: "Couldn't read that receipt. Try a clearer, flatter photo." }
   }
+
+  const billId = crypto.randomUUID()
+  const billTools = createActionTools(env, userId, callerJwt, `bill:${billId}`)
+
+  const receipt = await billTools.create(
+    'receipt',
+    {
+      merchant: parsed.merchant,
+      printedSubtotalCents: parsed.subtotalCents,
+      printedTotalCents: parsed.totalCents,
+      imageId: imageId ?? '',
+    },
+    'receipt',
+  )
+  if (!receipt.success) return { success: false, error: 'Could not save the bill; try again' }
+
+  const lines = [
+    ...parsed.items.map((i) => ({
+      name: i.name,
+      qty: i.qty,
+      priceCents: i.priceCents,
+      kind: i.priceCents < 0 ? 'discount' : 'item',
+    })),
+    { name: 'Tax', qty: 1, priceCents: parsed.taxCents, kind: 'tax' },
+    ...(parsed.tipCents > 0 ? [{ name: 'Tip', qty: 1, priceCents: parsed.tipCents, kind: 'tip' }] : []),
+  ]
+  for (const line of lines) {
+    const created = await billTools.create('items', line)
+    if (!created.success) return { success: false, error: 'Could not save the bill; try again' }
+  }
+
+  // hostId is userBound: the room stamps the caller (the host) on these rows.
+  const bill = await tools.create(
+    'bills',
+    { title: parsed.merchant, status: 'review', totalCents: parsed.totalCents, participantIds: [] },
+    billId,
+  )
+  if (!bill.success) return { success: false, error: 'Could not save the bill; try again' }
+
+  return { success: true, data: { billId, check: checkReceipt(parsed) } }
 }

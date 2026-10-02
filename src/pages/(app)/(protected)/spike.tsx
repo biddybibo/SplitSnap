@@ -1,9 +1,14 @@
 /**
- * SPIKE — throwaway test page for the parseReceipt action. Delete with the spike.
+ * SPIKE — throwaway end-to-end check for the real parseReceipt: uploads a photo,
+ * then reads the new bill's room back to prove the writes landed. Delete in slice 3.
  */
 
 import { useState } from 'react'
-import { getAuthToken } from 'deepspace'
+import { getAuthToken, RecordScope, useQuery } from 'deepspace'
+import {
+  receiptSchema,
+  itemsSchema,
+} from '../../../schemas/bill-room-schemas'
 
 const MAX_EDGE = 1600
 
@@ -19,15 +24,32 @@ async function resizeToJpegBase64(file: File): Promise<string> {
   return dataUrl.slice(dataUrl.indexOf(',') + 1)
 }
 
+function BillReadback() {
+  const receipt = useQuery('receipt')
+  const items = useQuery('items')
+  return (
+    <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>
+      {`Read back from the bill room (receipt: ${receipt.status}, items: ${items.status})\n\n`}
+      {JSON.stringify(
+        { receipt: receipt.records.map((r) => r.data), items: items.records.map((r) => r.data) },
+        null,
+        2,
+      )}
+    </pre>
+  )
+}
+
 export default function SpikePage() {
   const [busy, setBusy] = useState(false)
   const [output, setOutput] = useState('')
+  const [billId, setBillId] = useState<string | null>(null)
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
     setBusy(true)
+    setBillId(null)
     setOutput('Parsing…')
     const started = Date.now()
     try {
@@ -40,9 +62,9 @@ export default function SpikePage() {
         },
         body: JSON.stringify({ imageBase64, mimeType: 'image/jpeg' }),
       })
-      const json = await res.json()
-      const kb = Math.round((imageBase64.length * 3) / 4 / 1024)
-      setOutput(`HTTP ${res.status} · ${kb} KB sent · ${Date.now() - started} ms\n\n${JSON.stringify(json, null, 2)}`)
+      const json = (await res.json()) as { success: boolean; data?: { billId: string } }
+      setOutput(`HTTP ${res.status} · ${Date.now() - started} ms\n\n${JSON.stringify(json, null, 2)}`)
+      if (json.success && json.data) setBillId(json.data.billId)
     } catch (err) {
       setOutput(String(err))
     } finally {
@@ -52,9 +74,14 @@ export default function SpikePage() {
 
   return (
     <div style={{ padding: 16 }}>
-      <h1>parseReceipt spike</h1>
+      <h1>parseReceipt spike v2</h1>
       <input type="file" accept="image/*" onChange={onFile} disabled={busy} />
       <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{output}</pre>
+      {billId && (
+        <RecordScope roomId={`bill:${billId}`} schemas={[receiptSchema, itemsSchema]} isolated>
+          <BillReadback />
+        </RecordScope>
+      )}
     </div>
   )
 }
