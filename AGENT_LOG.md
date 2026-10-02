@@ -123,3 +123,14 @@ One entry per session: what I asked for, what the agent produced, what I verifie
   includes the area under the toolbar) + `viewport-fit=cover` + safe-area bottom padding. Checked `h-dvh` actually
   wins in the built CSS (with `h-screen` alongside it, h-screen won). Logo: added the white receipt lines from
   logo-mark.svg to `Logo.tsx` (ink lines on the white strip in the dark variant).
+
+## 2026-10-02 — Invite sheet (design board 3b)
+- Asked: our own invite UI instead of the OS share sheet, per Invite.dc.html.
+- Agent produced: `InviteSheet` bottom sheet: "Send a link" / "Scan at the table" tabs; link field + Copy (Copied
+  state); Text (`sms:?&body=`), WhatsApp (`wa.me`), Email (`mailto:`), More (OS share sheet, or copy); editable
+  "Message they'll get"; real QR via `qrcode@1.5.4` (MIT) at error-correction H with the logo in the centre —
+  decoded with macOS Core Image to confirm it scans; "At the table" with Host / Here now / Joined. Opened from
+  Invite on the claim screen and from the host's first Share (→ `?invite=1`). Left out "Add guest" (guests not
+  built) and "1 link · Not opened" (needs invite tracking). Removed `src/lib/share.ts`. npm audit's one low finding
+  is the pre-existing esbuild dev-server (Windows) issue, not qrcode.
+- Verified / changed: 

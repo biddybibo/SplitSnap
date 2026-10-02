@@ -7,15 +7,16 @@
  * (uniqueOn), so the UI can't claim for anyone else even if it tried.
  */
 
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useCallback, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth, useMutations, usePresenceRoom, useQuery } from 'deepspace'
 import { Pencil } from 'lucide-react'
 import { buttonVariants, useToast } from '@/components/ui'
 import { claimsByLine, itemsTotalFor, unclaimedCount, type ClaimRow } from '@/lib/claims'
 import { formatCents } from '@/lib/money'
-import { shareBillLink } from '@/lib/share'
+import { reconcile } from '@/lib/reconcile'
 import { cn } from '@/lib/utils'
+import { InviteSheet } from './InviteSheet'
 import { Avatar, AvatarStack, JoinCard, type Participant } from './Table'
 import type { Item, ReceiptRow } from './types'
 
@@ -29,6 +30,13 @@ export function ClaimScreen({ billId }: { billId: string }) {
   const { peers } = usePresenceRoom(`bill:${billId}`)
   const toast = useToast()
   const [pending, setPending] = useState<Set<string>>(new Set())
+  // `?invite=1` (the host's first share from the review screen) opens the sheet on arrival.
+  const [params, setParams] = useSearchParams()
+  const [inviteOpen, setInviteOpen] = useState(params.get('invite') === '1')
+  const closeInvite = useCallback(() => {
+    setInviteOpen(false)
+    if (params.has('invite')) setParams({}, { replace: true })
+  }, [params, setParams])
 
   const receipt = receiptQuery.records[0]?.data
   if (!receipt || itemsQuery.status === 'loading' || claimsQuery.status === 'loading') {
@@ -49,6 +57,15 @@ export function ClaimScreen({ billId }: { billId: string }) {
   const byLine = claimsByLine(lines, claims.map((c) => c.data))
   const myItemsCents = userId ? itemsTotalFor(userId, lines, byLine) : 0
   const unclaimed = unclaimedCount(lines, byLine)
+  const billTotalCents = reconcile(
+    itemsQuery.records.map((i) => ({ kind: i.data.kind, priceCents: i.data.priceCents })),
+    {
+      printedSubtotalCents: receipt.printedSubtotalCents ?? null,
+      printedTotalCents: receipt.printedTotalCents,
+      printedTipCents: receipt.printedTipCents ?? 0,
+      chargedCents: receipt.chargedCents ?? null,
+    },
+  ).grandTotalCents
 
   // Presence: who has the bill open right now, and who's here but hasn't tapped anything.
   const hereIds = new Set([...(userId ? [userId] : []), ...peers.map((p) => p.userId)])
@@ -75,15 +92,6 @@ export function ClaimScreen({ billId }: { billId: string }) {
     }
   }
 
-  async function invite() {
-    try {
-      if ((await shareBillLink(billId, receipt!.merchant)) === 'copied') {
-        toast.success('Link copied', 'Paste it in your group chat.')
-      }
-    } catch (err) {
-      toast.error("Couldn't share the link", err instanceof Error ? err.message : undefined)
-    }
-  }
 
   return (
     <div className="mx-auto flex min-h-full w-full max-w-md flex-col">
@@ -107,7 +115,7 @@ export function ClaimScreen({ billId }: { billId: string }) {
             )}
             <button
               type="button"
-              onClick={invite}
+              onClick={() => setInviteOpen(true)}
               className="h-10 rounded-full border border-input bg-card px-3.5 text-[13px] font-semibold hover:bg-accent"
             >
               Invite
@@ -202,6 +210,19 @@ export function ClaimScreen({ billId }: { billId: string }) {
           Preview the final split
         </Link>
       </footer>
+
+      {inviteOpen && (
+        <InviteSheet
+          billId={billId}
+          merchant={receipt.merchant}
+          totalCents={billTotalCents}
+          hostName={hostName === 'the host' ? 'A friend' : hostName}
+          hostId={receipt.hostId}
+          people={people}
+          hereIds={hereIds}
+          onClose={closeInvite}
+        />
+      )}
     </div>
   )
 }

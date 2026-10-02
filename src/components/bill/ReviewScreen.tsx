@@ -9,14 +9,13 @@
  */
 
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAsyncResource, useAuth, useDisplayName, useMutations, useQuery, useR2Files } from 'deepspace'
 import { AlertTriangle, Check, ChevronDown, ChevronLeft, Plus, Trash2 } from 'lucide-react'
 import { Button, useToast } from '@/components/ui'
 import { callAction } from '@/lib/actions'
 import { formatCents, parseDollars } from '@/lib/money'
 import { reconcile, tipForPercent, type LineKind } from '@/lib/reconcile'
-import { shareBillLink } from '@/lib/share'
 import { cn } from '@/lib/utils'
 import { HandleField, MoneyField, TextField } from './fields'
 import type { Participant } from './Table'
@@ -34,6 +33,7 @@ export function ReviewScreen({ billId }: { billId: string }) {
   const receiptMutations = useMutations<ReceiptRow>('receipt')
   const participantsQuery = useQuery<Participant>('participants', { orderBy: 'createdAt', orderDir: 'asc' })
   const myName = useDisplayName()
+  const navigate = useNavigate()
   const toast = useToast()
   const [adding, setAdding] = useState(false)
   const [sharing, setSharing] = useState(false)
@@ -122,10 +122,8 @@ export function ReviewScreen({ billId }: { billId: string }) {
     try {
       // The host takes their own seat the first time they share.
       if (!me) await callAction('joinBill', { billId, displayName: (myName ?? 'Host').split(' ')[0] })
-      // Once the host has a seat, the bill page switches them to the claim screen.
-      if ((await shareBillLink(billId, receipt.merchant)) === 'copied') {
-        toast.success('Link copied', 'Paste it in your group chat.')
-      }
+      // With a seat, the host's bill page is the claim screen; land there with the invite sheet open.
+      navigate(`/b/${billId}?invite=1`)
     } catch (err) {
       toast.error("Couldn't share the link", err instanceof Error ? err.message : undefined)
     } finally {
