@@ -29,13 +29,14 @@ export default function Landing() {
         data-testid="static-landing"
         className="flex min-h-screen flex-col items-center justify-center px-6 text-center"
       >
-        <p className="mb-3 text-sm uppercase tracking-widest text-muted-foreground">{APP_NAME}</p>
-        <h1 className="mb-4 max-w-2xl text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
-          Split the check in a snap.
+        <p className="mb-3 font-display text-lg font-bold tracking-tight text-foreground">{APP_NAME}</p>
+        <h1 className="mb-4 max-w-2xl font-display text-4xl font-semibold leading-[1.1] tracking-tight text-foreground sm:text-5xl">
+          Snap it. Share it. Everyone picks their own.
         </h1>
         <p className="mb-8 max-w-md text-muted-foreground">
-          Photograph the receipt. Everyone taps what they had on their own phone,
-          live, and gets an exact amount with a Venmo, Cash App or PayPal link.
+          No more passing one phone around the table. Photograph the receipt, everyone
+          taps what they had on their own phone, and each person gets an exact amount
+          with a Venmo, Cash App or PayPal link.
         </p>
         <Link
           to="/home"

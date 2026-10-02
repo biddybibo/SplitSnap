@@ -13,12 +13,13 @@ import type { ActionHandler } from 'deepspace/worker'
 import { createDeepSpaceAI } from 'deepspace/worker'
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
+import type { ActionTools } from 'deepspace/worker'
 import { createActionTools } from '../server/action-tools'
+import { DAILY_PARSE_LIMIT, parsesUsedToday, utcDay } from './usage'
 import type { Env } from '../../worker'
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp']
-const DAILY_PARSE_LIMIT = 10
 
 const receiptSchema = z.object({
   merchant: z.string(),
@@ -77,8 +78,26 @@ export function checkReceipt(
   }
 }
 
-function utcDay(): string {
-  return new Date().toISOString().slice(0, 10)
+type PayHandles = {
+  payVenmo?: string
+  payCashApp?: string
+  payPaypal?: string
+}
+
+/** The pay handles from the host's most recent bill, so they only type them once. Best effort. */
+async function lastPayHandles(
+  tools: ActionTools,
+  env: Env,
+  userId: string,
+  callerJwt: string,
+): Promise<PayHandles> {
+  const last = await tools.query('bills', { where: { hostId: userId }, orderBy: 'createdAt', orderDir: 'desc', limit: 1 })
+  const lastId = last.success ? last.data.records[0]?.recordId : undefined
+  if (!lastId) return {}
+  const prev = await createActionTools(env, userId, callerJwt, `bill:${lastId}`).get<PayHandles>('receipt', 'receipt')
+  if (!prev.success) return {}
+  const { payVenmo, payCashApp, payPaypal } = prev.data.record.data
+  return { payVenmo: payVenmo ?? '', payCashApp: payCashApp ?? '', payPaypal: payPaypal ?? '' }
 }
 
 export const parseReceipt: ActionHandler<Env> = async ({ userId, params, tools, env, callerJwt }) => {
@@ -98,9 +117,8 @@ export const parseReceipt: ActionHandler<Env> = async ({ userId, params, tools, 
 
   // Daily cap. Counted before the AI call so failed or abandoned parses still count.
   const day = utcDay()
-  const usage = await tools.query<{ parses?: number }>('usage', { where: { userId, day }, limit: 1 })
-  if (!usage.success) return { success: false, error: 'Could not check your daily limit; try again' }
-  const used = usage.data.records[0]?.data.parses ?? 0
+  const used = await parsesUsedToday(tools, userId, day)
+  if (used === null) return { success: false, error: 'Could not check your daily limit; try again' }
   if (used >= DAILY_PARSE_LIMIT) {
     return { success: false, error: `Daily limit reached (${DAILY_PARSE_LIMIT} receipts). Try again tomorrow.` }
   }
@@ -130,6 +148,7 @@ export const parseReceipt: ActionHandler<Env> = async ({ userId, params, tools, 
     return { success: false, error: "Couldn't read that receipt. Try a clearer, flatter photo." }
   }
 
+  const payHandles = await lastPayHandles(tools, env, userId, callerJwt)
   const billId = crypto.randomUUID()
   const billTools = createActionTools(env, userId, callerJwt, `bill:${billId}`)
 
@@ -143,6 +162,7 @@ export const parseReceipt: ActionHandler<Env> = async ({ userId, params, tools, 
       receiptNumber: parsed.receiptNumber ?? '',
       printedAt: parsed.printedAt ?? '',
       imageId: imageId ?? '',
+      ...payHandles,
     },
     'receipt',
   )

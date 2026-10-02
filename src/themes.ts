@@ -18,9 +18,9 @@
 
 export const THEMES = [
   {
-    id: 'receipt',
-    label: 'Receipt',
-    description: "SplitSnap's theme: warm receipt-paper white, ink text, money green.",
+    id: 'splitsnap',
+    label: 'SplitSnap',
+    description: 'From the design mockup: cool off-white, ink text, blue accent.',
   },
   {
     id: 'slate',

@@ -68,3 +68,16 @@ One entry per session: what I asked for, what the agent produced, what I verifie
   `receiptNumber`, `printedAt`, `printedTipCents`. Printed-tip rule: inside printed total; added tip on top.
   tsc/lint clean, 39/39 unit, 8/8 runtime. Not yet checked signed-in on a phone.
 - Verified / changed: 
+
+## 2026-10-02 — Slice 3c: adopt the design mockup
+- Asked: compare the built screens with my mockup (Start / Review / Claim / Settle); switch to its look; keep the
+  reconcile extras in a collapsible section; host pay handles on the bill, remembered for the next one.
+- Agent produced: `splitsnap` theme (mockup palette + Space Grotesk / IBM Plex Sans / Plex Mono); Start rebuilt to
+  the mockup (dashed scan card, "N of 10 scans left today" via new `scansLeft` action, bill rows with date · people and
+  Open / Locked / Settle up pills); Review rebuilt ("Check what we read", summary card with green "adds up" / orange
+  "off by" line, boxed prices, totals card with 15/18/20/22% tip chips, collapsible "Check against the receipt" with
+  fees/tax, printed numbers, amount charged and adjustment, "How friends pay you" card, pinned Share button disabled
+  until Saturday); receipt gains payVenmo/payCashApp/payPaypal, copied by parseReceipt from the host's last bill;
+  `cleanHandle` + tests. Tip chips moved under the tip row (one line didn't fit 390px). Skipped "1 item left" on the
+  bills list (needs every bill room). tsc/lint clean, 47/47 unit, 8/8 runtime; 390px screenshots of landing + home.
+- Verified / changed: 

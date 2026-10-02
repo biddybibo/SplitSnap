@@ -48,7 +48,7 @@ final totals, emails) goes through a server action.
 | Collection | Room | Key columns | Permissions (member) | Why |
 | --- | --- | --- | --- | --- |
 | `bills` | app | title, hostId, status, total, participantIds (json) | read `shared` via `collaboratorsField`; writes via server actions | "My bills" list; status |
-| `receipt` | bill | merchant, printedSubtotalCents, printedTotalCents, chargedCents (optional), imageId, hostId | read true; update `own` via `ownerField: hostId` | One row per bill; the printed numbers the check runs against |
+| `receipt` | bill | merchant, printedSubtotalCents, printedTotalCents, printedTipCents, chargedCents (optional), receiptNumber, printedAt, imageId, payVenmo / payCashApp / payPaypal (host's handles, copied from their last bill), hostId | read true; update `own` via `ownerField: hostId` | One row per bill; the printed numbers the check runs against |
 | `items` | bill | name, qty, priceCents (line total), kind (item/discount claimed; fee/tax/tip/adjustment split by subtotal), hostId | read true; create false; update/delete `own` via `ownerField: hostId` (userBound) | Host corrects AI output; new lines (tip, adjustment, a missed line) via a host-only `addItem` action |
 | `claims` | bill | itemId, userId (userBound, immutable) | create true; update/delete `own`; `uniqueOn: [itemId, userId]` | One claim per person per item, enforced by the room |
 | `participants` | bill | userId (userBound, immutable), displayName, paid (boolean) | create true; update `own`; `uniqueOn: [userId]` | Signed-in people at the table; "I paid" |
@@ -159,6 +159,11 @@ Playwright scaffolding.
 | Rounding drift | Unit tests on `computeShares` | Leftover pennies to host |
 
 ## Mockups
+
+Design source of truth: https://claude.ai/artifact/9QjWESh735oucWXhV2vQoa (Start, Review, Claim, Settle). Theme
+`splitsnap`: #F5F5F2 ground, #16181D ink, #1F5FD1 blue, #1F7A4D green, #8A3F06 / #FCEFE3 warning; Space Grotesk
+display, IBM Plex Sans body, IBM Plex Mono money. Review keeps the reconcile extras in a collapsible "Check against
+the receipt" section.
 
 Four phone screens (390×844): start a bill, check what the AI read, live claiming, locked and settle.
 Sample bill: Taqueria Luna, 7 items, subtotal $58.00, tax $5.37, tip 20% $11.60, total $74.97.

@@ -19,6 +19,17 @@ import type { CollectionSchema, RolePermissions } from 'deepspace/schema'
 const NO_ACCESS: RolePermissions = { read: false, create: false, update: false, delete: false }
 const READ_ONLY: RolePermissions = { read: true, create: false, update: false, delete: false }
 
+const RECEIPT_HOST_FIELDS = [
+  'merchant',
+  'printedSubtotalCents',
+  'printedTotalCents',
+  'printedTipCents',
+  'chargedCents',
+  'payVenmo',
+  'payCashApp',
+  'payPaypal',
+]
+
 /** One row per bill: the printed numbers the three-way check runs against. Created by parseReceipt. */
 export const receiptSchema: CollectionSchema = {
   name: 'receipt',
@@ -34,26 +45,18 @@ export const receiptSchema: CollectionSchema = {
     // Optional "amount charged to card"; when set, tip = charged − (printed total − printed tip).
     { name: 'chargedCents', storage: 'number', interpretation: 'plain' },
     { name: 'imageId', storage: 'text', interpretation: 'plain' },
+    // How friends pay the host. Bare handles (no @, $ or URL); parseReceipt copies them from the host's last bill.
+    { name: 'payVenmo', storage: 'text', interpretation: 'plain' },
+    { name: 'payCashApp', storage: 'text', interpretation: 'plain' },
+    { name: 'payPaypal', storage: 'text', interpretation: 'plain' },
     { name: 'hostId', storage: 'text', interpretation: 'plain', userBound: true, immutable: true },
   ],
   ownerField: 'hostId',
   permissions: {
     '*': NO_ACCESS,
     viewer: READ_ONLY,
-    member: {
-      read: true,
-      create: false,
-      update: 'own',
-      delete: false,
-      writableFields: ['merchant', 'printedSubtotalCents', 'printedTotalCents', 'printedTipCents', 'chargedCents'],
-    },
-    admin: {
-      read: true,
-      create: false,
-      update: 'own',
-      delete: false,
-      writableFields: ['merchant', 'printedSubtotalCents', 'printedTotalCents', 'printedTipCents', 'chargedCents'],
-    },
+    member: { read: true, create: false, update: 'own', delete: false, writableFields: RECEIPT_HOST_FIELDS },
+    admin: { read: true, create: false, update: 'own', delete: false, writableFields: RECEIPT_HOST_FIELDS },
   },
 }
 

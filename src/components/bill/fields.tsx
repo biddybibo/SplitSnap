@@ -19,10 +19,12 @@ interface MoneyFieldProps {
   allowEmpty?: boolean
   placeholder?: string
   disabled?: boolean
+  /** Bordered at rest (item prices in the mockup) instead of borderless until hovered. */
+  boxed?: boolean
   className?: string
 }
 
-export function MoneyField({ cents, onSave, label, allowEmpty, placeholder, disabled, className }: MoneyFieldProps) {
+export function MoneyField({ cents, onSave, label, allowEmpty, placeholder, disabled, boxed, className }: MoneyFieldProps) {
   const shown = cents === null ? '' : formatCents(cents)
   const [draft, setDraft] = useState(shown)
   const [invalid, setInvalid] = useState(false)
@@ -74,7 +76,13 @@ export function MoneyField({ cents, onSave, label, allowEmpty, placeholder, disa
           e.currentTarget.blur()
         }
       }}
-      className={cn(inputBase, 'w-28 text-right font-mono tabular-nums', invalid && 'border-destructive', className)}
+      className={cn(
+        inputBase,
+        'w-24 text-right font-mono tabular-nums',
+        boxed && 'border-border bg-card',
+        invalid && 'border-destructive',
+        className,
+      )}
     />
   )
 }
@@ -125,5 +133,69 @@ export function TextField({ value, onSave, label, disabled, className }: TextFie
       }}
       className={cn(inputBase, 'min-w-0 flex-1', className)}
     />
+  )
+}
+
+interface HandleFieldProps {
+  value: string
+  onSave: (value: string) => void
+  label: string
+  prefix: string
+  placeholder: string
+}
+
+/**
+ * A pay handle without its prefix: "@maya-r" and "venmo.com/maya-r" both save as "maya-r".
+ * Only letters, digits and - _ . survive, so a handle can't smuggle anything into a pay link.
+ */
+export function cleanHandle(input: string): string {
+  return input
+    .trim()
+    .replace(/^https?:\/\//i, '')
+    .replace(/^(www\.)?(venmo\.com\/(u\/)?|cash\.app\/|paypal\.me\/)/i, '')
+    .replace(/^[@$]/, '')
+    .replace(/[^A-Za-z0-9_.-]/g, '')
+    .slice(0, 30)
+}
+
+export function HandleField({ value, onSave, label, prefix, placeholder }: HandleFieldProps) {
+  const [draft, setDraft] = useState(value)
+  const focused = useRef(false)
+
+  useEffect(() => {
+    if (!focused.current) setDraft(value)
+  }, [value])
+
+  function commit() {
+    focused.current = false
+    const next = cleanHandle(draft)
+    setDraft(next)
+    if (next !== value) onSave(next)
+  }
+
+  return (
+    <label className="flex items-center gap-3">
+      <span className="w-20 shrink-0 text-sm font-medium">{label}</span>
+      <span className="flex min-w-0 flex-1 items-center rounded-md border border-border bg-card focus-within:border-ring">
+        <span className="pl-3 text-muted-foreground">{prefix}</span>
+        <input
+          aria-label={`${label} handle`}
+          value={draft}
+          placeholder={placeholder}
+          autoCapitalize="off"
+          autoCorrect="off"
+          spellCheck={false}
+          onFocus={() => {
+            focused.current = true
+          }}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur()
+          }}
+          className="min-w-0 flex-1 bg-transparent py-2 pr-3 text-base outline-none"
+        />
+      </span>
+    </label>
   )
 }

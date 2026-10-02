@@ -59,6 +59,17 @@
   --color-info: #3b82f6;
   --color-info-foreground: #ffffff;
 
+  /* Soft tints for selected / success / warning surfaces; themes override them. */
+  --color-primary-soft: rgba(129, 140, 248, 0.15);
+  --color-success-soft: rgba(16, 185, 129, 0.12);
+  --color-warning-soft: rgba(245, 158, 11, 0.12);
+
+  /* Type: Space Grotesk for display, IBM Plex Sans for UI, IBM Plex Mono for money.
+     Loaded from Google Fonts in index.html; each stack falls back to system fonts. */
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Space Grotesk', 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
   /*
    * Shadows — slate (default). Each theme in themes.css tunes these.
    *
@@ -164,11 +175,11 @@
   }
 
   body {
-    font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--font-sans);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    font-size: 14px;
+    font-size: 15px;
     color: var(--color-foreground);
   }
 

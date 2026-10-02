@@ -7,16 +7,19 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AuthOverlay, useAsyncResource, useAuth, useQuery, useR2Files } from 'deepspace'
-import { Camera, ImageUp, Receipt, RotateCcw } from 'lucide-react'
+import { Camera, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { callAction } from '@/lib/actions'
 import { resizeToJpegBase64 } from '@/lib/image'
-import { formatCents } from '@/lib/money'
+import { cn } from '@/lib/utils'
 
 interface Bill {
   title: string
+  hostId: string
   status: 'review' | 'locked'
   totalCents: number
+  participantIds?: string[]
+  printedAt?: string
 }
 
 interface ParseResult {
@@ -27,13 +30,12 @@ export default function HomePage() {
   const { isSignedIn } = useAuth()
 
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-8 px-5 pb-12 pt-8">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-3xl font-semibold tracking-tight">Split the check in a snap.</h1>
-        <p className="text-muted-foreground">
-          Photograph the receipt. Everyone taps what they had on their own phone and gets an exact
-          amount with a pay link.
-        </p>
+    <div className="mx-auto flex w-full max-w-md flex-col gap-5 px-5 pb-12 pt-3">
+      <header className="flex flex-col gap-1.5">
+        <h1 className="font-display text-[30px] font-semibold leading-[1.1] tracking-tight">
+          Snap it. Share it. Everyone picks their own.
+        </h1>
+        <p className="text-muted-foreground">No more passing one phone around the table.</p>
       </header>
       {isSignedIn ? (
         <>
@@ -50,13 +52,22 @@ export default function HomePage() {
 function SignedOutStart() {
   const [showAuth, setShowAuth] = useState(false)
   return (
-    <section className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5">
-      <p className="text-sm text-muted-foreground">Sign in to start a bill or join one.</p>
-      <Button size="lg" onClick={() => setShowAuth(true)}>
+    <section className="flex flex-col items-center gap-4 rounded-2xl border-[1.5px] border-dashed border-input bg-card px-5 py-6 text-center">
+      <CameraBadge />
+      <p className="text-muted-foreground">Sign in to start a bill, or to join one a friend shared.</p>
+      <Button size="lg" className="h-[50px] w-full text-base" onClick={() => setShowAuth(true)}>
         Sign in
       </Button>
       {showAuth && <AuthOverlay onClose={() => setShowAuth(false)} />}
     </section>
+  )
+}
+
+function CameraBadge() {
+  return (
+    <span className="flex size-14 items-center justify-center rounded-full bg-primary-soft">
+      <Camera className="size-7 text-primary" strokeWidth={1.8} aria-hidden />
+    </span>
   )
 }
 
@@ -67,6 +78,11 @@ function ScanReceipt() {
   const libraryInput = useRef<HTMLInputElement>(null)
   const [photo, setPhoto] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+
+  const scans = useAsyncResource(
+    (signal) => callAction<{ remaining: number; limit: number }>('scansLeft', {}, signal),
+    [],
+  )
 
   useEffect(() => {
     if (!photo) return
@@ -91,9 +107,11 @@ function ScanReceipt() {
     { enabled: photo !== null, retry: 0, slowAfterMs: 8000 },
   )
 
+  const { reload: reloadScans } = scans
   useEffect(() => {
     if (parse.status === 'ready' && parse.data) navigate(`/b/${parse.data.billId}`)
-  }, [parse.status, parse.data, navigate])
+    if (parse.status === 'error') reloadScans()
+  }, [parse.status, parse.data, navigate, reloadScans])
 
   function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -102,27 +120,28 @@ function ScanReceipt() {
   }
 
   const busy = parse.status === 'loading' || parse.status === 'ready'
+  const outOfScans = scans.data?.remaining === 0
 
   return (
-    <section className="flex flex-col gap-3">
+    <section className="flex flex-col items-center gap-3.5 rounded-2xl border-[1.5px] border-dashed border-input bg-card px-5 py-6">
       {/* capture= opens the camera directly on phones; the second input offers the photo library. */}
       <input ref={cameraInput} type="file" accept="image/*" capture="environment" hidden onChange={onPick} />
       <input ref={libraryInput} type="file" accept="image/*" hidden onChange={onPick} />
 
       {photo && previewUrl ? (
-        <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4">
+        <div className="flex w-full flex-col gap-4">
           <div className="flex gap-4">
             <img
               src={previewUrl}
               alt="Your receipt"
-              className="h-28 w-20 shrink-0 rounded-md border border-border object-cover"
+              className="h-[68px] w-[52px] shrink-0 rounded-md border border-border object-cover"
             />
             <div className="flex min-w-0 flex-col justify-center gap-1" aria-live="polite">
               {busy && (
                 <>
-                  <p className="flex items-center gap-2 font-medium">
+                  <p className="flex items-center gap-2 font-semibold">
                     <span
-                      className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+                      className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
                       aria-hidden
                     />
                     Reading the receipt…
@@ -134,7 +153,7 @@ function ScanReceipt() {
               )}
               {parse.status === 'error' && (
                 <>
-                  <p className="font-medium text-destructive">Couldn&apos;t read that receipt</p>
+                  <p className="font-semibold text-destructive">Couldn&apos;t read that receipt</p>
                   <p className="text-sm text-muted-foreground">{parse.error}</p>
                 </>
               )}
@@ -142,10 +161,15 @@ function ScanReceipt() {
           </div>
           {parse.status === 'error' && (
             <div className="flex gap-2">
-              <Button className="flex-1" onClick={parse.reload}>
+              <Button className="h-11 flex-1" disabled={outOfScans} onClick={parse.reload}>
                 <RotateCcw /> Try again
               </Button>
-              <Button variant="outline" className="flex-1" onClick={() => libraryInput.current?.click()}>
+              <Button
+                variant="outline"
+                className="h-11 flex-1"
+                disabled={outOfScans}
+                onClick={() => libraryInput.current?.click()}
+              >
                 Different photo
               </Button>
             </div>
@@ -153,22 +177,54 @@ function ScanReceipt() {
         </div>
       ) : (
         <>
-          <Button size="lg" className="h-14 text-base" onClick={() => cameraInput.current?.click()}>
-            <Camera className="size-5" /> Snap the receipt
-          </Button>
-          <Button variant="outline" size="lg" onClick={() => libraryInput.current?.click()}>
-            <ImageUp /> Upload a photo
-          </Button>
-          <p className="text-center text-xs text-muted-foreground">
-            Lay it flat in good light, with the total in the shot.
-          </p>
+          <CameraBadge />
+          <div className="flex flex-col items-center gap-1 text-center">
+            <h2 className="font-display text-[19px] font-semibold">Snap the receipt</h2>
+            <p className="text-sm text-muted-foreground">We read the items. You fix anything we miss.</p>
+          </div>
+          <div className="flex w-full flex-col gap-2.5">
+            <Button
+              size="lg"
+              className="h-[50px] text-base"
+              disabled={outOfScans}
+              onClick={() => cameraInput.current?.click()}
+            >
+              Take photo
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              className="h-[50px] bg-card text-base"
+              disabled={outOfScans}
+              onClick={() => libraryInput.current?.click()}
+            >
+              Upload an image
+            </Button>
+          </div>
         </>
+      )}
+      {scans.data && (
+        <p className={cn('text-[13px]', outOfScans ? 'text-warning' : 'text-muted-foreground')}>
+          {outOfScans
+            ? 'No scans left today. They reset at 8 PM Eastern.'
+            : `${scans.data.remaining} of ${scans.data.limit} scans left today`}
+        </p>
       )}
     </section>
   )
 }
 
+function billDate(printedAt: string | undefined, createdAt: string): string {
+  const raw = printedAt ? (printedAt.length === 10 ? `${printedAt}T00:00` : printedAt) : createdAt
+  const d = new Date(raw)
+  if (Number.isNaN(d.getTime())) return ''
+  const today = new Date()
+  if (d.toDateString() === today.toDateString()) return 'Today'
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
 function MyBills() {
+  const { userId } = useAuth()
   const { records, status } = useQuery<Bill>('bills', { orderBy: 'createdAt', orderDir: 'desc', limit: 20 })
 
   if (status === 'loading') return null
@@ -178,21 +234,39 @@ function MyBills() {
   if (records.length === 0) return null
 
   return (
-    <section className="flex flex-col gap-2">
-      <h2 className="text-sm font-medium text-muted-foreground">Your bills</h2>
-      <ul className="flex flex-col divide-y divide-border rounded-xl border border-border bg-card">
-        {records.map((bill) => (
-          <li key={bill.recordId}>
-            <Link to={`/b/${bill.recordId}`} className="flex items-center gap-3 px-4 py-3">
-              <Receipt className="size-4 shrink-0 text-muted-foreground" />
-              <span className="min-w-0 flex-1 truncate">{bill.data.title || 'Untitled bill'}</span>
-              <span className="font-mono tabular-nums">{formatCents(bill.data.totalCents ?? 0)}</span>
-              <span className="w-14 text-right text-xs text-muted-foreground">
-                {bill.data.status === 'locked' ? 'Locked' : 'Open'}
-              </span>
-            </Link>
-          </li>
-        ))}
+    <section className="flex flex-col gap-2.5">
+      <h2 className="text-[13px] font-semibold uppercase tracking-[0.6px] text-muted-foreground">Your bills</h2>
+      <ul className="flex flex-col gap-2.5">
+        {records.map((bill) => {
+          const people = 1 + (bill.data.participantIds?.length ?? 0)
+          const isHost = bill.data.hostId === userId
+          const locked = bill.data.status === 'locked'
+          const pill = locked
+            ? isHost
+              ? { label: 'Locked', className: 'bg-muted text-muted-foreground' }
+              : { label: 'Settle up', className: 'bg-warning-soft text-warning' }
+            : { label: 'Open', className: 'bg-primary-soft text-primary' }
+          return (
+            <li key={bill.recordId}>
+              <Link
+                to={`/b/${bill.recordId}`}
+                className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3.5 hover:border-input"
+              >
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="truncate font-semibold">{bill.data.title || 'Untitled bill'}</span>
+                  <span className="text-[13px] text-muted-foreground">
+                    {[billDate(bill.data.printedAt, bill.createdAt), `${people} ${people === 1 ? 'person' : 'people'}`]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </span>
+                </span>
+                <span className={cn('shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold', pill.className)}>
+                  {pill.label}
+                </span>
+              </Link>
+            </li>
+          )
+        })}
       </ul>
     </section>
   )

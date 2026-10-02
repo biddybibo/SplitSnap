@@ -66,6 +66,12 @@ Full spec: `PLAN.md`. Read it before starting any new slice of work.
 - No API keys or secrets in the repo. Integrations go through the DeepSpace proxy; anything else via `deepspace secrets`.
 - Use `useAsyncResource` for integration-backed UI (loading / error with retry / empty / success).
 
+## Design
+- Mockups (source of truth for layout and look): https://claude.ai/artifact/9QjWESh735oucWXhV2vQoa
+- Theme `splitsnap` in `src/themes.css`; fonts in `index.html`; `font-display` for headings, `font-mono` for money.
+- Pay handles live on the bill's `receipt` row (friends can't read the host's `users` row); `cleanHandle` strips
+  everything but letters, digits and `- _ .` before saving.
+
 ## Out of scope
 Moving money in-app, multi-currency, uneven per-item splits, receipt history/analytics, native mobile app,
 reading bank transactions. Stretch only if the core path works: host-added guests, Resend nudges, daily reminder
