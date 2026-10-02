@@ -66,7 +66,8 @@ export const itemsSchema: CollectionSchema = {
     {
       name: 'kind',
       storage: 'text',
-      interpretation: { kind: 'select', options: ['item', 'tax', 'tip', 'discount', 'adjustment'] },
+      // item/discount are claimed; fee/tax/tip/adjustment split by subtotal.
+      interpretation: { kind: 'select', options: ['item', 'tax', 'tip', 'discount', 'fee', 'adjustment'] },
       default: 'item',
     },
     { name: 'hostId', storage: 'text', interpretation: 'plain', userBound: true, immutable: true },

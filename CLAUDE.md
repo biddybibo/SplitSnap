@@ -25,19 +25,20 @@ Full spec: `PLAN.md`. Read it before starting any new slice of work.
   `createActionTools(env, userId, callerJwt, "bill:<billId>")` from `src/server/action-tools.ts`.
 - Money is integer cents everywhere. Leftover rounding pennies go to the host so shares sum to the receipt total.
 - `computeShares(items, claims)` is one pure function used by the client preview AND the server `lockBill` action.
-- Shared items split evenly among claimants; tax, tip and `adjustment` lines split in proportion to each person's subtotal.
+- Shared items split evenly among claimants; `fee` (service charge etc.), tax, tip and `adjustment` lines split in
+  proportion to each person's subtotal. Only `item`/`discount` lines are claimed.
 - Item `priceCents` is the line total (qty already applied).
 - The printed total (plus tip) is the bill. The host can enter "amount charged to card"; then tip = charged − printed total.
 - Callers merge `claims` + `guestClaims` into one claim list before `computeShares` (guest id `guest:<guestId>`).
 
 ## Server actions
 - `parseReceipt`: signed-in only, max 10/user/day (`usage`), image ≤ 5 MB, Claude via `createDeepSpaceAI` +
-  `generateText` + `Output.object` (Zod: merchant, items[{name, qty, priceCents}], subtotalCents (nullable), taxCents,
-  tipCents, totalCents). `generateObject` is deprecated in ai@7.
-  Three-way check: lines = printed subtotal, and subtotal + tax = printed total; report which check failed so the UI
+  `generateText` + `Output.object` (Zod: merchant, items[{name, qty, priceCents}], subtotalCents (nullable),
+  fees[{name, cents}], taxCents, tipCents, totalCents). `generateObject` is deprecated in ai@7.
+  Three-way check: lines = printed subtotal, and subtotal + fees + tax + tip = printed total; report which failed so the UI
   can point at the line(s) or the total. Flag mismatches, don't hide them. Write `receipt` + `items` with `tools.create`.
 - `lockBill`: host-only (check caller against `bills.hostId`). Refuse if any item is unclaimed, or unless
-  items + tax + adjustments = printed total to the cent (and printed total + tip = `chargedCents` when set).
+  items + fees + tax + adjustments = printed total to the cent (and printed total + tip = `chargedCents` when set).
   Merge claims + guestClaims, run `computeShares`, write `shares`, set status `locked`.
 - `addItem`: host-only; adds a line (tip, adjustment, a missed item). Members can't create `items`.
 - `joinBill`: adds the caller to `bills.participantIds` so the bill shows in their list (members can't write `bills`).

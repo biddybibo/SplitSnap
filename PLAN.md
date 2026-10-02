@@ -47,7 +47,7 @@ final totals, emails) goes through a server action.
 | --- | --- | --- | --- | --- |
 | `bills` | app | title, hostId, status, total, participantIds (json) | read `shared` via `collaboratorsField`; writes via server actions | "My bills" list; status |
 | `receipt` | bill | merchant, printedSubtotalCents, printedTotalCents, chargedCents (optional), imageId, hostId | read true; update `own` via `ownerField: hostId` | One row per bill; the printed numbers the check runs against |
-| `items` | bill | name, qty, priceCents (line total), kind (item/tax/tip/discount/adjustment), hostId | read true; create false; update/delete `own` via `ownerField: hostId` (userBound) | Host corrects AI output; new lines (tip, adjustment, a missed line) via a host-only `addItem` action |
+| `items` | bill | name, qty, priceCents (line total), kind (item/discount claimed; fee/tax/tip/adjustment split by subtotal), hostId | read true; create false; update/delete `own` via `ownerField: hostId` (userBound) | Host corrects AI output; new lines (tip, adjustment, a missed line) via a host-only `addItem` action |
 | `claims` | bill | itemId, userId (userBound, immutable) | create true; update/delete `own`; `uniqueOn: [itemId, userId]` | One claim per person per item, enforced by the room |
 | `participants` | bill | userId (userBound, immutable), displayName, paid (boolean) | create true; update `own`; `uniqueOn: [userId]` | Signed-in people at the table; "I paid" |
 | `guests` | bill | displayName, paid (boolean) | read true; no member writes | Host-added people who won't sign in; written only by `addGuest` |
@@ -57,8 +57,8 @@ final totals, emails) goes through a server action.
 
 Money is integer cents. `computeShares(items, claims)` is one pure function shared by client preview and server
 lock. Leftover pennies go to the host. Callers merge `claims` and `guestClaims` into one claim list before calling it
-(guest claimant id `guest:<guestId>`), so the function never sees the two collections. `adjustment` lines split
-in proportion to subtotals, like tax.
+(guest claimant id `guest:<guestId>`), so the function never sees the two collections. `fee` and `adjustment` lines
+split in proportion to subtotals, like tax.
 
 ## Key flows
 
@@ -69,7 +69,7 @@ in proportion to subtotals, like tax.
 2. **Review**: host sees the receipt photo beside the numbers and edits names/prices/total inline via `useMutations`;
    `ownerField` means only the host's edits land. The host enters the tip (15/18/20% shortcuts), or the optional
    "amount charged to card", in which case tip = charged − printed total.
-   - **Three-way check:** lines sum to the printed subtotal, and subtotal + tax = printed total. Checking both says
+   - **Three-way check:** lines sum to the printed subtotal, and subtotal + fees + tax + tip = printed total. Checking both says
      *where* a misread is: a bad total/tax is highlighted separately from a bad line.
    - **Mismatch:** a banner shows "Lines add up to $X; receipt says $Y, off by $Z". The host fixes a line or the
      total, or taps "Add $Z adjustment". Sharing is allowed while mismatched; locking is not.
@@ -79,7 +79,7 @@ in proportion to subtotals, like tax.
    (host-only actions that check the caller is the bill's host). Guests live in their own `guests` collection and
    their claims in `guestClaims`, so `participants` and `claims` keep their forgery protection. (`userBound` stamps
    the writer's id even on server-action writes, so guests can't be `participants` rows written by the host.)
-4. **Lock and settle** (`lockBill`, host-only): refuses if anything is unclaimed, or unless items + tax + adjustments
+4. **Lock and settle** (`lockBill`, host-only): refuses if anything is unclaimed, or unless items + fees + tax + adjustments
    equal the printed total to the cent (and, when `chargedCents` is set, printed total + tip = charged). Merges
    `claims` + `guestClaims`, runs `computeShares`, writes `shares`, sets `locked`. Each person sees their total, prefilled pay links, and an "I paid" toggle.
 5. **Reminders** (stretch): `nudgeUnpaid` emails unpaid participants via Resend; a daily cron does the same for
@@ -134,7 +134,7 @@ Playwright scaffolding.
 
 **I do or verify myself:**
 - [ ] Write `computeShares` + unit tests (rounding, shared items, zero tip, discount lines, adjustment lines,
-      guest claimants, pennies sum to total)
+      fee lines, guest claimants, pennies sum to total)
 - [ ] Review every permissions block and `userBound`/`uniqueOn` line against this plan
 - [ ] Run the break-it tests on the deployed URL
 - [ ] Run the core path on two real phones with two accounts

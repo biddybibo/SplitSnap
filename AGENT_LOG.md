@@ -44,3 +44,6 @@ One entry per session: what I asked for, what the agent produced, what I verifie
   receipts #1 and #2. Deleted the `/spike` page. tsc/lint clean, 16/16 unit tests.
   Not yet run end to end (no test accounts; needs the slice 3 upload screen).
 - Verified / changed: 
+- E2E on deployed /spike v2 (receipt #3 Westin / Lona, 6.2 s): bill-room writes confirmed by read-back; AI read
+  correctly. Bug found: 18% service charge saved as an item, so both checks falsely failed. Fix: `fees[]` in the
+  AI schema, `fee` item kind (split by subtotal like tax), check = subtotal + fees + tax + tip. Test case #3 added.

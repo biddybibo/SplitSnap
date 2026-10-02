@@ -30,6 +30,9 @@ const receiptSchema = z.object({
     }),
   ),
   subtotalCents: z.number().int().nullable().describe('Printed subtotal, or null if the receipt prints none'),
+  fees: z
+    .array(z.object({ name: z.string(), cents: z.number().int() }))
+    .describe('Charges added after the subtotal other than tax and tip: service charge, delivery, bag fee'),
   taxCents: z.number().int(),
   tipCents: z.number().int(),
   totalCents: z.number().int(),
@@ -40,7 +43,9 @@ type ParsedReceipt = z.infer<typeof receiptSchema>
 const PROMPT =
   'Extract this restaurant receipt. All money is integer cents. ' +
   'One entry per printed line item; priceCents is the line total exactly as printed (qty already applied). ' +
-  'Discounts are items with negative priceCents. Do not include subtotal, tax, tip or total as items. ' +
+  'Discounts are items with negative priceCents. Do not include subtotal, fees, tax, tip or total as items. ' +
+  'Fees are charges added after the subtotal other than tax and tip (service charge, delivery fee, bag fee); ' +
+  'list each in fees, even if it is printed among the items. Suggested gratuity amounts are not tips. ' +
   'subtotalCents is the printed subtotal, or null if none is printed. ' +
   'Use 0 for tax or tip if not printed. totalCents is the final total printed on the receipt. ' +
   'Copy the numbers as printed even if they do not add up; never correct them.'
@@ -51,14 +56,15 @@ const PROMPT =
  */
 export function checkReceipt(r: ParsedReceipt) {
   const linesCents = r.items.reduce((sum, i) => sum + i.priceCents, 0)
+  const feesCents = r.fees.reduce((sum, f) => sum + f.cents, 0)
   const subtotalForTotal = r.subtotalCents ?? linesCents
   return {
     linesCents,
     // null when the receipt prints no subtotal: nothing to compare the lines against.
     linesMatchSubtotal: r.subtotalCents === null ? null : linesCents === r.subtotalCents,
-    subtotalPlusTaxTipMatchesTotal: subtotalForTotal + r.taxCents + r.tipCents === r.totalCents,
-    // What lockBill will require: lines + tax + tip (+ adjustments) = printed total.
-    offByCents: r.totalCents - (linesCents + r.taxCents + r.tipCents),
+    subtotalPlusChargesMatchesTotal: subtotalForTotal + feesCents + r.taxCents + r.tipCents === r.totalCents,
+    // What lockBill will require: lines + fees + tax + tip (+ adjustments) = printed total.
+    offByCents: r.totalCents - (linesCents + feesCents + r.taxCents + r.tipCents),
   }
 }
 
@@ -137,6 +143,7 @@ export const parseReceipt: ActionHandler<Env> = async ({ userId, params, tools, 
       priceCents: i.priceCents,
       kind: i.priceCents < 0 ? 'discount' : 'item',
     })),
+    ...parsed.fees.map((f) => ({ name: f.name, qty: 1, priceCents: f.cents, kind: 'fee' })),
     { name: 'Tax', qty: 1, priceCents: parsed.taxCents, kind: 'tax' },
     ...(parsed.tipCents > 0 ? [{ name: 'Tip', qty: 1, priceCents: parsed.tipCents, kind: 'tip' }] : []),
   ]
