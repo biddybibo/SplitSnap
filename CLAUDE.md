@@ -45,7 +45,10 @@ Full spec: `PLAN.md`. Read it before starting any new slice of work.
 - Reconcile rules live in `src/lib/reconcile.ts` (review screen and `lockBill` must both use it). A printed tip is
   inside `printedTotalCents`; an added tip is on top. `parseReceipt` also stores `receiptNumber` / `printedAt` for
   duplicate detection (never card digits).
-- `joinBill`: adds the caller to `bills.participantIds` so the bill shows in their list (members can't write `bills`).
+- `joinBill`: creates the caller's `participants` row and adds them to `bills.participantIds` so the bill shows in
+  their list (members can't write `bills`). It writes `bills` *as the host* (id read from the bill) so a userBound
+  re-stamp can never put a friend in `hostId`, and re-reads to survive two friends joining at once. The host calls
+  it on first share to get their own participants row.
 - `addGuest` / `claimForGuest` (stretch): host-only. The only writers of `guests` and `guestClaims`.
 - `nudgeUnpaid` (stretch): host-only, emails unpaid participants via `resend/send-email`. Emails never returned to client.
 

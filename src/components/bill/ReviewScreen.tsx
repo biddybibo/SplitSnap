@@ -10,7 +10,7 @@
 
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useAsyncResource, useAuth, useMutations, useQuery, useR2Files } from 'deepspace'
+import { useAsyncResource, useAuth, useDisplayName, useMutations, useQuery, useR2Files } from 'deepspace'
 import { AlertTriangle, Check, ChevronDown, ChevronLeft, Plus, Trash2 } from 'lucide-react'
 import { Button, useToast } from '@/components/ui'
 import { callAction } from '@/lib/actions'
@@ -18,6 +18,7 @@ import { formatCents, parseDollars } from '@/lib/money'
 import { reconcile, tipForPercent, type LineKind } from '@/lib/reconcile'
 import { cn } from '@/lib/utils'
 import { HandleField, MoneyField, TextField } from './fields'
+import { JoinCard, WhoIsHere, type Participant } from './Table'
 
 interface Item {
   name: string
@@ -52,8 +53,11 @@ export function ReviewScreen({ billId }: { billId: string }) {
   const itemsQuery = useQuery<Item>('items', { orderBy: 'createdAt', orderDir: 'asc' })
   const itemMutations = useMutations<Item>('items')
   const receiptMutations = useMutations<ReceiptRow>('receipt')
+  const participantsQuery = useQuery<Participant>('participants', { orderBy: 'createdAt', orderDir: 'asc' })
+  const myName = useDisplayName()
   const toast = useToast()
   const [adding, setAdding] = useState(false)
+  const [sharing, setSharing] = useState(false)
   const [photoOpen, setPhotoOpen] = useState(false)
 
   if (receiptQuery.status === 'loading' || itemsQuery.status === 'loading') {
@@ -125,6 +129,41 @@ export function ReviewScreen({ billId }: { billId: string }) {
   }
 
   const itemCount = claimable.filter((i) => i.data.kind === 'item').length
+  const people = participantsQuery.records.map((p) => p.data)
+  const me = people.find((p) => p.userId === userId)
+  const hostName = people.find((p) => p.userId === receipt.hostId)?.displayName ?? 'Your host'
+  const hasPayHandle = Boolean(receipt.payVenmo || receipt.payCashApp || receipt.payPaypal)
+  const canShare = canEdit && check.reconciled && hasPayHandle && !sharing
+  const shareHint = !check.reconciled
+    ? 'Fix the numbers above first.'
+    : !hasPayHandle
+      ? 'Add a way for friends to pay you.'
+      : 'Friends join with the link and sign in to pick their items.'
+
+  async function share() {
+    setSharing(true)
+    try {
+      // The host takes their own seat the first time they share.
+      if (!me) await callAction('joinBill', { billId, displayName: (myName ?? 'Host').split(' ')[0] })
+      const url = `${window.location.origin}/b/${billId}`
+      const text = `Split ${receipt.merchant} with me on SplitSnap. Tap what you had.`
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: 'SplitSnap', text, url })
+        } catch (err) {
+          if (err instanceof DOMException && err.name === 'AbortError') return // closed the share sheet
+          throw err
+        }
+      } else {
+        await navigator.clipboard.writeText(url)
+        toast.success('Link copied', 'Paste it in your group chat.')
+      }
+    } catch (err) {
+      toast.error("Couldn't share the link", err instanceof Error ? err.message : undefined)
+    } finally {
+      setSharing(false)
+    }
+  }
 
   return (
     <div className="mx-auto flex min-h-full w-full max-w-md flex-col gap-3.5 px-5 pt-2">
@@ -176,11 +215,13 @@ export function ReviewScreen({ billId }: { billId: string }) {
       </section>
       {photoOpen && receipt.imageId && <PhotoFull imageId={receipt.imageId} onClose={() => setPhotoOpen(false)} />}
 
-      {!isHost && (
+      {!isHost && !me && participantsQuery.status === 'ready' && <JoinCard billId={billId} hostName={hostName} />}
+      {!isHost && me && (
         <p className="text-sm text-muted-foreground">
-          The host is checking the receipt. You&apos;ll be able to tap what you had soon.
+          You&apos;re at the table. Claiming your items opens here next.
         </p>
       )}
+      {(me || isHost) && <WhoIsHere people={people} hostId={receipt.hostId} meId={userId} />}
 
       {/* Items */}
       <section className={cn(card, 'flex flex-col px-3.5 py-1')}>
@@ -309,13 +350,11 @@ export function ReviewScreen({ billId }: { billId: string }) {
       <div className="flex-1" />
       {isHost && (
         <div className="sticky bottom-0 -mx-5 flex flex-col gap-2 bg-background/95 px-5 pb-5 pt-3 backdrop-blur">
-          <Button size="lg" className="h-[52px] text-base" disabled>
-            Share with the table
+          <Button size="lg" className="h-[52px] text-base" disabled={!canShare} onClick={share}>
+            {sharing ? 'Opening…' : 'Share with the table'}
           </Button>
-          <p className="text-center text-[12.5px] text-muted-foreground">
-            {check.reconciled
-              ? 'Everything adds up. Sharing with friends is coming next.'
-              : 'Fix the numbers above first. Sharing with friends is coming next.'}
+          <p className={cn('text-center text-[12.5px]', canShare ? 'text-muted-foreground' : 'text-warning')}>
+            {shareHint}
           </p>
         </div>
       )}

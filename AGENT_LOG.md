@@ -81,3 +81,12 @@ One entry per session: what I asked for, what the agent produced, what I verifie
   `cleanHandle` + tests. Tip chips moved under the tip row (one line didn't fit 390px). Skipped "1 item left" on the
   bills list (needs every bill room). tsc/lint clean, 47/47 unit, 8/8 runtime; 390px screenshots of landing + home.
 - Verified / changed: 
+
+## 2026-10-02 — Slice 4a: share + join
+- Asked: make "Share with the table" work; start Saturday's share/join slice early.
+- Agent produced: `joinBill` action (participants row + participantIds, written as the host, retry-on-race); Share
+  button enabled when the bill reconciles and has a pay handle (hint says what's missing), host auto-joins on first
+  share, phone share sheet with clipboard fallback; Join card for signed-in friends (name prefilled, editable);
+  "At the table" list with mockup avatar colors (`src/lib/people.ts`). Bill room now mounts participants + claims.
+  tsc/lint clean, 47/47 unit, 8/8 runtime. Two-account test not yet run.
+- Verified / changed: 
