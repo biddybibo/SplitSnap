@@ -11,6 +11,7 @@ import { Camera, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { callAction } from '@/lib/actions'
 import { resizeToJpegBase64 } from '@/lib/image'
+import { takeReturnPath } from '@/lib/returnTo'
 import { cn } from '@/lib/utils'
 
 interface Bill {
@@ -28,6 +29,14 @@ interface ParseResult {
 
 export default function HomePage() {
   const { isSignedIn } = useAuth()
+  const navigate = useNavigate()
+
+  // Back from sign-in that started on a shared bill link: go to that bill.
+  useEffect(() => {
+    if (!isSignedIn) return
+    const path = takeReturnPath()
+    if (path) navigate(path, { replace: true })
+  }, [isSignedIn, navigate])
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-5 px-5 pb-12 pt-3">

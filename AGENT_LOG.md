@@ -90,3 +90,9 @@ One entry per session: what I asked for, what the agent produced, what I verifie
   "At the table" list with mockup avatar colors (`src/lib/people.ts`). Bill room now mounts participants + claims.
   tsc/lint clean, 47/47 unit, 8/8 runtime. Two-account test not yet run.
 - Verified / changed: 
+- Friend's link test (Messages → Safari, "server stopped responding"): worker logs show every friend request
+  answered `ok` in ms, plus iMessage preview fetches, so the hang was network-side on their phone (not fixable
+  here). Logs did reveal a real bug: OAuth always returned to /home, stranding a friend who signed in from a bill
+  link. Fix: `src/lib/returnTo.ts` remembers `/b/<uuid>` (only that shape; 10-min expiry) and /home sends them
+  back; tests cover open-redirect attempts. Also replaced the blank auth-check screen with a branded "Opening…"
+  screen that suggests Safari/Chrome or a connection check after 5 s. 55/55 unit, 8/8 runtime.

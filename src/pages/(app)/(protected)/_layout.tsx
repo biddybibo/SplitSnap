@@ -14,9 +14,10 @@
  */
 
 import { useState } from 'react'
-import { Link, Outlet } from 'react-router-dom'
+import { Link, Outlet, useLocation } from 'react-router-dom'
 import { AuthGate, AuthOverlay } from 'deepspace'
 import { Button } from '@/components/ui'
+import { rememberReturnPath } from '@/lib/returnTo'
 
 export default function ProtectedLayout() {
   return (
@@ -28,6 +29,7 @@ export default function ProtectedLayout() {
 
 function SignedOutPanel() {
   const [showAuthModal, setShowAuthModal] = useState(false)
+  const { pathname } = useLocation()
 
   return (
     <div className="flex min-h-[60vh] items-center justify-center px-6 py-20">
@@ -36,7 +38,14 @@ function SignedOutPanel() {
         <p className="mt-2 text-sm text-muted-foreground">
           This page is only available to signed-in users.
         </p>
-        <Button className="mt-6 w-full" onClick={() => setShowAuthModal(true)}>
+        <Button
+          className="mt-6 w-full"
+          onClick={() => {
+            // Sign-in returns to /home; remember a shared bill link so /home can send them back.
+            rememberReturnPath(pathname)
+            setShowAuthModal(true)
+          }}
+        >
           Sign in
         </Button>
         <Link

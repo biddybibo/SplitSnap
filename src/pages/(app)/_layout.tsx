@@ -15,7 +15,7 @@
  * their own layout without inheriting it.
  */
 
-import { Suspense, type ReactNode } from 'react'
+import { Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Outlet } from 'react-router-dom'
 import { DeepSpaceAuthProvider, useAuthStatus } from 'deepspace'
 import { RecordProvider, RecordScope } from 'deepspace'
@@ -61,9 +61,7 @@ function AuthBoot({ children }: { children: ReactNode }) {
   // silent no-op. Keep this wiring when customizing the layout.
   const { error, warning } = useToast()
 
-  if (!isLoaded) {
-    return <div aria-busy="true" className="fixed inset-0 bg-background" />
-  }
+  if (!isLoaded) return <BootScreen />
 
   return (
     <RecordProvider
@@ -76,5 +74,30 @@ function AuthBoot({ children }: { children: ReactNode }) {
         {children}
       </RecordScope>
     </RecordProvider>
+  )
+}
+
+/**
+ * Shown while the first session check resolves. A blank screen here read as
+ * "the site is down" on slow phone connections, so say what's happening, and
+ * after a few seconds suggest the usual fixes.
+ */
+function BootScreen() {
+  const [slow, setSlow] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setSlow(true), 5000)
+    return () => clearTimeout(t)
+  }, [])
+  return (
+    <div aria-busy="true" className="fixed inset-0 flex flex-col items-center justify-center gap-3 bg-background px-8 text-center">
+      <span className="font-display text-2xl font-bold tracking-tight">{APP_NAME}</span>
+      <span className="size-5 animate-spin rounded-full border-2 border-primary border-t-transparent" aria-hidden />
+      <span className="text-sm text-muted-foreground">Opening…</span>
+      {slow && (
+        <span className="max-w-xs text-sm text-muted-foreground">
+          Taking a while? Check your connection, or open the link in Safari or Chrome.
+        </span>
+      )}
+    </div>
   )
 }
