@@ -58,3 +58,13 @@ One entry per session: what I asked for, what the agent produced, what I verifie
   white, ink, money green) as default; landing + SEO copy; APP_NAME → "SplitSnap"; deleted `/spike`.
   tsc/lint clean, 17/17 unit, 8/8 runtime; checked 390px screenshots of landing and signed-out home.
 - Verified / changed: 
+
+## 2026-10-02 — Slice 3b: review screen
+- Asked: review screen at /b/<billId>; also capture check number + printed date for later duplicate detection.
+- Agent produced: `ReviewScreen` (photo via private `readFile`, inline name/price edits via `useMutations`, delete,
+  "Add a missed line", fees/tax, editable printed subtotal/total, mismatch banner pointing at lines vs total with an
+  adjustment button, tip 15/18/20/none/custom, amount charged → tip, bill total; read-only for non-hosts);
+  `addItem` host-only action; `src/lib/reconcile.ts` (shared with lockBill) + `parseDollars`; receipt/bills gain
+  `receiptNumber`, `printedAt`, `printedTipCents`. Printed-tip rule: inside printed total; added tip on top.
+  tsc/lint clean, 39/39 unit, 8/8 runtime. Not yet checked signed-in on a phone.
+- Verified / changed: 

@@ -22,6 +22,11 @@ const DAILY_PARSE_LIMIT = 10
 
 const receiptSchema = z.object({
   merchant: z.string(),
+  receiptNumber: z.string().nullable().describe('Check / order / ticket number as printed, or null'),
+  printedAt: z
+    .string()
+    .nullable()
+    .describe('Date and time printed on the receipt as local YYYY-MM-DDTHH:MM (date only: YYYY-MM-DD), or null'),
   items: z.array(
     z.object({
       name: z.string(),
@@ -48,13 +53,17 @@ const PROMPT =
   'list each in fees, even if it is printed among the items. Suggested gratuity amounts are not tips. ' +
   'subtotalCents is the printed subtotal, or null if none is printed. ' +
   'Use 0 for tax or tip if not printed. totalCents is the final total printed on the receipt. ' +
+  'receiptNumber is the check, order or ticket number (not a table number, phone number or card digits). ' +
+  'Never return card numbers or approval codes anywhere. ' +
   'Copy the numbers as printed even if they do not add up; never correct them.'
 
 /**
  * Three-way check. Each comparison is reported separately so the review
  * screen can point at the lines or at the total/tax, not just "something's off".
  */
-export function checkReceipt(r: ParsedReceipt) {
+export function checkReceipt(
+  r: Pick<ParsedReceipt, 'items' | 'subtotalCents' | 'fees' | 'taxCents' | 'tipCents' | 'totalCents'>,
+) {
   const linesCents = r.items.reduce((sum, i) => sum + i.priceCents, 0)
   const feesCents = r.fees.reduce((sum, f) => sum + f.cents, 0)
   const subtotalForTotal = r.subtotalCents ?? linesCents
@@ -130,6 +139,9 @@ export const parseReceipt: ActionHandler<Env> = async ({ userId, params, tools, 
       merchant: parsed.merchant,
       printedSubtotalCents: parsed.subtotalCents,
       printedTotalCents: parsed.totalCents,
+      printedTipCents: parsed.tipCents,
+      receiptNumber: parsed.receiptNumber ?? '',
+      printedAt: parsed.printedAt ?? '',
       imageId: imageId ?? '',
     },
     'receipt',
@@ -155,7 +167,14 @@ export const parseReceipt: ActionHandler<Env> = async ({ userId, params, tools, 
   // hostId is userBound: the room stamps the caller (the host) on these rows.
   const bill = await tools.create(
     'bills',
-    { title: parsed.merchant, status: 'review', totalCents: parsed.totalCents, participantIds: [] },
+    {
+      title: parsed.merchant,
+      status: 'review',
+      totalCents: parsed.totalCents,
+      participantIds: [],
+      receiptNumber: parsed.receiptNumber ?? '',
+      printedAt: parsed.printedAt ?? '',
+    },
     billId,
   )
   if (!bill.success) return { success: false, error: 'Could not save the bill; try again' }

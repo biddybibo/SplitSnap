@@ -15,7 +15,9 @@ phone, then hands each person an exact amount and a pay link.
 4. Shared items split evenly among everyone who tapped them; tax and tip split in proportion to each subtotal.
 5. Host locks the bill; everyone sees their final amount with Venmo / Cash App / PayPal links and can mark themselves paid.
 
-**Stretch:** host-added guests (`addGuest` / `claimForGuest`), email nudges to unpaid people, a daily reminder job,
+**Stretch:** host-added guests (`addGuest` / `claimForGuest`); duplicate-receipt detection (match on restaurant +
+date + check number, then date/time + total, then total + line prices within 7 days → "You already scanned this
+receipt — open it / start new anyway") and host-only bill deletion; email nudges to unpaid people, a daily reminder job,
 a "who's still picking" indicator.
 
 **Future (after the deadline):** a "claim your spot" link the host sends a guest through the phone's share sheet;
@@ -71,6 +73,9 @@ split in proportion to subtotals, like tax.
    "amount charged to card", in which case tip = charged − printed total.
    - **Three-way check:** lines sum to the printed subtotal, and subtotal + fees + tax + tip = printed total. Checking both says
      *where* a misread is: a bad total/tax is highlighted separately from a bad line.
+   - **Tips:** a tip printed on the receipt is inside the printed total; a tip the host adds is on top. The check
+     runs on non-tip lines + printed tip; the bill total is the sum of all lines. Math lives in `src/lib/reconcile.ts`,
+     shared with `lockBill`.
    - **Mismatch:** a banner shows "Lines add up to $X; receipt says $Y, off by $Z". The host fixes a line or the
      total, or taps "Add $Z adjustment". Sharing is allowed while mismatched; locking is not.
 3. **Live claiming**: friends open `/b/<billId>`, sign in, join (`participants` row). Tapping creates/removes a

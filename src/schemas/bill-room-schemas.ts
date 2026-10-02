@@ -26,7 +26,12 @@ export const receiptSchema: CollectionSchema = {
     { name: 'merchant', storage: 'text', interpretation: 'plain' },
     { name: 'printedSubtotalCents', storage: 'number', interpretation: 'plain' },
     { name: 'printedTotalCents', storage: 'number', interpretation: 'plain' },
-    // Optional "amount charged to card"; when set, tip = charged − printed total.
+    // A tip printed on the receipt is already inside printedTotalCents; a tip the host adds is not.
+    { name: 'printedTipCents', storage: 'number', interpretation: 'plain', default: 0 },
+    // As printed, for duplicate detection: check/order number and local date-time (YYYY-MM-DDTHH:MM).
+    { name: 'receiptNumber', storage: 'text', interpretation: 'plain' },
+    { name: 'printedAt', storage: 'text', interpretation: 'plain' },
+    // Optional "amount charged to card"; when set, tip = charged − (printed total − printed tip).
     { name: 'chargedCents', storage: 'number', interpretation: 'plain' },
     { name: 'imageId', storage: 'text', interpretation: 'plain' },
     { name: 'hostId', storage: 'text', interpretation: 'plain', userBound: true, immutable: true },
@@ -40,14 +45,14 @@ export const receiptSchema: CollectionSchema = {
       create: false,
       update: 'own',
       delete: false,
-      writableFields: ['merchant', 'printedSubtotalCents', 'printedTotalCents', 'chargedCents'],
+      writableFields: ['merchant', 'printedSubtotalCents', 'printedTotalCents', 'printedTipCents', 'chargedCents'],
     },
     admin: {
       read: true,
       create: false,
       update: 'own',
       delete: false,
-      writableFields: ['merchant', 'printedSubtotalCents', 'printedTotalCents', 'chargedCents'],
+      writableFields: ['merchant', 'printedSubtotalCents', 'printedTotalCents', 'printedTipCents', 'chargedCents'],
     },
   },
 }

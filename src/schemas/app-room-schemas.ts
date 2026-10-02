@@ -20,6 +20,9 @@ export const billsSchema: CollectionSchema = {
     { name: 'status', storage: 'text', interpretation: { kind: 'select', options: ['review', 'locked'] }, default: 'review' },
     { name: 'totalCents', storage: 'number', interpretation: 'plain' },
     { name: 'participantIds', storage: 'text', interpretation: { kind: 'json' }, default: [] },
+    // Copied from the receipt for listing and duplicate detection.
+    { name: 'receiptNumber', storage: 'text', interpretation: 'plain' },
+    { name: 'printedAt', storage: 'text', interpretation: 'plain' },
   ],
   ownerField: 'hostId',
   collaboratorsField: 'participantIds',

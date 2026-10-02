@@ -40,7 +40,11 @@ Full spec: `PLAN.md`. Read it before starting any new slice of work.
 - `lockBill`: host-only (check caller against `bills.hostId`). Refuse if any item is unclaimed, or unless
   items + fees + tax + adjustments = printed total to the cent (and printed total + tip = `chargedCents` when set).
   Merge claims + guestClaims, run `computeShares`, write `shares`, set status `locked`.
-- `addItem`: host-only; adds a line (tip, adjustment, a missed item). Members can't create `items`.
+- `addItem`: host-only (checked against `bills.hostId`); adds a line (tip, adjustment, a missed item). Members can't
+  create `items`.
+- Reconcile rules live in `src/lib/reconcile.ts` (review screen and `lockBill` must both use it). A printed tip is
+  inside `printedTotalCents`; an added tip is on top. `parseReceipt` also stores `receiptNumber` / `printedAt` for
+  duplicate detection (never card digits).
 - `joinBill`: adds the caller to `bills.participantIds` so the bill shows in their list (members can't write `bills`).
 - `addGuest` / `claimForGuest` (stretch): host-only. The only writers of `guests` and `guestClaims`.
 - `nudgeUnpaid` (stretch): host-only, emails unpaid participants via `resend/send-email`. Emails never returned to client.
