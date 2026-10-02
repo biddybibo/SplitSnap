@@ -4,7 +4,7 @@ SplitSnap is a take-home build exercise for DeepSpace (deadline Mon Oct 5, 2026,
 A host photographs a receipt, AI extracts the line items, friends open a shared link on their phones and
 claim what they had in real time, and everyone gets an exact amount plus Venmo/Cash App/PayPal links.
 
-Full spec: `docs/PLAN.md`. Read it before starting any new slice of work.
+Full spec: `PLAN.md`. Read it before starting any new slice of work.
 
 ## How we work
 - Use the deepspace skill and the SDK docs (https://docs.deep.space) as the source of truth. Do not guess SDK APIs.
@@ -16,23 +16,39 @@ Full spec: `docs/PLAN.md`. Read it before starting any new slice of work.
 ## Architecture decisions (already made)
 - Web app, mobile-first (390px wide phones). No native app.
 - App room `app:<APP_ID>` holds `bills` (index) and `usage` (AI caps). Each bill gets its own room `bill:<billId>`
-  holding `items`, `claims`, `participants`, `shares`.
+  holding `receipt`, `items`, `claims`, `participants`, `guests`, `guestClaims`, `shares`.
+- Every RecordRoom registers the full schema list (`src/schemas.ts`), so every collection exists in every room.
+  Permissions must hold whichever room a collection lands in.
+- `userBound` stamps the writer's id on every write, server actions included. A column that must hold someone else's
+  id (shares.userId, guest rows) is never userBound.
+- Action tools (`src/server/action-routes.ts`) only reach the app room today; bill-room writes need them extended.
 - Money is integer cents everywhere. Leftover rounding pennies go to the host so shares sum to the receipt total.
 - `computeShares(items, claims)` is one pure function used by the client preview AND the server `lockBill` action.
-- Shared items split evenly among claimants; tax and tip split in proportion to each person's subtotal.
+- Shared items split evenly among claimants; tax, tip and `adjustment` lines split in proportion to each person's subtotal.
+- Item `priceCents` is the line total (qty already applied).
+- The printed total (plus tip) is the bill. The host can enter "amount charged to card"; then tip = charged − printed total.
+- Callers merge `claims` + `guestClaims` into one claim list before `computeShares` (guest id `guest:<guestId>`).
 
 ## Server actions
 - `parseReceipt`: signed-in only, max 10/user/day (`usage`), image ≤ 5 MB, Claude via `createDeepSpaceAI` +
-  `generateObject` (Zod: merchant, items[{name, qty, priceCents}], taxCents, tipCents, totalCents).
-  Validate items + tax + tip ≈ total; flag mismatches, don't hide them. Write items with `tools.create`.
-- `lockBill`: host-only (check caller against `bills.hostId`). Refuse if any item is unclaimed.
-  Run `computeShares`, write `shares`, set status `locked`.
+  `generateObject` (Zod: merchant, items[{name, qty, priceCents}], subtotalCents, taxCents, tipCents, totalCents).
+  Three-way check: lines = printed subtotal, and subtotal + tax = printed total; report which check failed so the UI
+  can point at the line(s) or the total. Flag mismatches, don't hide them. Write `receipt` + `items` with `tools.create`.
+- `lockBill`: host-only (check caller against `bills.hostId`). Refuse if any item is unclaimed, or unless
+  items + tax + adjustments = printed total to the cent (and printed total + tip = `chargedCents` when set).
+  Merge claims + guestClaims, run `computeShares`, write `shares`, set status `locked`.
+- `addItem`: host-only; adds a line (tip, adjustment, a missed item). Members can't create `items`.
+- `joinBill`: adds the caller to `bills.participantIds` so the bill shows in their list (members can't write `bills`).
+- `addGuest` / `claimForGuest` (stretch): host-only. The only writers of `guests` and `guestClaims`.
 - `nudgeUnpaid` (stretch): host-only, emails unpaid participants via `resend/send-email`. Emails never returned to client.
 
 ## Permissions (must hold server-side, not just in UI)
-- `items`: `ownerField: hostId` (userBound) — only the host edits.
+- `items`: `ownerField: hostId` (userBound) — only the host edits/deletes; create false (actions only).
 - `claims`: `userId` is `userBound` + `immutable`; `uniqueOn: [itemId, userId]`; update/delete `own`.
-- `participants`: create true, update `own` (the "I paid" toggle).
+- `receipt`: `ownerField: hostId` — only the host edits the printed numbers / amount charged.
+- `guestClaims`: read true, no member writes; written only by `claimForGuest`.
+- `participants`: create true, update `own` (the "I paid" toggle), `uniqueOn: [userId]`.
+- `guests`: read true, no member writes; written only by `addGuest`.
 - `shares`: no member writes; written only by `lockBill`.
 - `usage`: no member access.
 - Keep the scaffold's users schema `read: 'own'`.
@@ -44,11 +60,12 @@ Full spec: `docs/PLAN.md`. Read it before starting any new slice of work.
 - Use `useAsyncResource` for integration-backed UI (loading / error with retry / empty / success).
 
 ## Out of scope
-Moving money in-app, multi-currency, uneven per-item splits, receipt history/analytics, native mobile app.
-Stretch only if the core path works: Resend nudges, daily reminder cron, presence indicator.
+Moving money in-app, multi-currency, uneven per-item splits, receipt history/analytics, native mobile app,
+reading bank transactions. Stretch only if the core path works: host-added guests, Resend nudges, daily reminder
+cron, presence indicator. Future: "claim your spot" link for guests via the share sheet.
 
 ## Core path that must work on the deployed URL
 1. Host signs in, uploads/snaps a receipt.
-2. AI extracts items/tax/tip/total; host fixes mistakes inline.
+2. AI extracts items/subtotal/tax/total; host checks against the photo, fixes mistakes inline, adds the tip.
 3. Host shares the link; friends sign in and claim items live.
 4. Host locks; everyone sees their final amount + pay links and can mark themselves paid.

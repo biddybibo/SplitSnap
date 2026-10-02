@@ -9,15 +9,22 @@ phone, then hands each person an exact amount and a pay link.
 
 **Core path (must work on the deployed URL):**
 1. Host signs in, snaps or uploads a receipt.
-2. AI extracts line items, tax, tip and total; host fixes anything wrong.
+2. AI extracts line items, subtotal, tax, tip and total; host checks them against the receipt photo, fixes anything
+   wrong, and enters the tip (or the amount charged to the card).
 3. Host shares a link; friends sign in and tap the items they had, seeing each other's picks live.
 4. Shared items split evenly among everyone who tapped them; tax and tip split in proportion to each subtotal.
 5. Host locks the bill; everyone sees their final amount with Venmo / Cash App / PayPal links and can mark themselves paid.
 
-**Stretch:** email nudges to unpaid people, a daily reminder job, a "who's still picking" indicator.
+**Stretch:** host-added guests (`addGuest` / `claimForGuest`), email nudges to unpaid people, a daily reminder job,
+a "who's still picking" indicator.
+
+**Future (after the deadline):** a "claim your spot" link the host sends a guest through the phone's share sheet;
+the guest signs in and their guest claims convert to normal claims.
 
 **Out of scope, on purpose:** moving money inside the app, multi-currency, item-level discounts beyond a negative
-line, uneven splits of one item, receipt history and analytics, a native mobile app.
+line, uneven splits of one item, receipt history and analytics, a native mobile app, reading the host's bank
+transactions to verify totals (bank-linking means financial-data consent and compliance, and the tipped charge
+usually posts 1–3 days later anyway — the host-entered "amount charged" field covers it).
 
 ## Architecture
 
@@ -25,7 +32,8 @@ line, uneven splits of one item, receipt history and analytics, a native mobile 
 Phone browser (React + Vite)
   ├─ WebSocket ─────────────► App room   (bills index, AI usage caps)
   ├─ WebSocket ─────────────► Bill room  (items, claims, participants, shares) + presence
-  └─ actions + file uploads ► Worker (Hono): parseReceipt, lockBill, nudgeUnpaid, /api/files proxy
+  └─ actions + file uploads ► Worker (Hono): parseReceipt, lockBill, addGuest, claimForGuest, nudgeUnpaid,
+                                 /api/files proxy
                                  ├─ writes as the app (tools.*) ► Bill room
                                  └─ signed platform proxy ► Auth · R2 files · Claude (AI) · Resend + cron
 ```
@@ -38,26 +46,42 @@ final totals, emails) goes through a server action.
 | Collection | Room | Key columns | Permissions (member) | Why |
 | --- | --- | --- | --- | --- |
 | `bills` | app | title, hostId, status, total, participantIds (json) | read `shared` via `collaboratorsField`; writes via server actions | "My bills" list; status |
-| `items` | bill | name, qty, priceCents, kind (item/tax/tip/discount), hostId | read true; update `own` via `ownerField: hostId` (userBound) | Host corrects AI output |
+| `receipt` | bill | merchant, printedSubtotalCents, printedTotalCents, chargedCents (optional), imageId, hostId | read true; update `own` via `ownerField: hostId` | One row per bill; the printed numbers the check runs against |
+| `items` | bill | name, qty, priceCents (line total), kind (item/tax/tip/discount/adjustment), hostId | read true; create false; update/delete `own` via `ownerField: hostId` (userBound) | Host corrects AI output; new lines (tip, adjustment, a missed line) via a host-only `addItem` action |
 | `claims` | bill | itemId, userId (userBound, immutable) | create true; update/delete `own`; `uniqueOn: [itemId, userId]` | One claim per person per item, enforced by the room |
-| `participants` | bill | userId, displayName, paid (boolean), isGuest | create true; update `own` | Who's at the table; "I paid" |
+| `participants` | bill | userId (userBound, immutable), displayName, paid (boolean) | create true; update `own`; `uniqueOn: [userId]` | Signed-in people at the table; "I paid" |
+| `guests` | bill | displayName, paid (boolean) | read true; no member writes | Host-added people who won't sign in; written only by `addGuest` |
+| `guestClaims` | bill | itemId, guestId | read true; no member writes | Claims the host makes for guests; written only by `claimForGuest` |
 | `shares` | bill | userId, subtotalCents, taxCents, tipCents, totalCents | read true; no member writes | Snapshot written by `lockBill` |
 | `usage` | app | userId, day, parses | no member access | Per-user daily AI cap |
 
 Money is integer cents. `computeShares(items, claims)` is one pure function shared by client preview and server
-lock. Leftover pennies go to the host.
+lock. Leftover pennies go to the host. Callers merge `claims` and `guestClaims` into one claim list before calling it
+(guest claimant id `guest:<guestId>`), so the function never sees the two collections. `adjustment` lines split
+in proportion to subtotals, like tax.
 
 ## Key flows
 
 1. **Parse** (`parseReceipt`): client resizes to ~1600px JPEG, uploads via `useR2Files()` (private `self` scope),
    posts base64 to the action. Action checks sign-in + daily cap, calls Claude (`createDeepSpaceAI` +
-   `generateObject` with a Zod schema), validates the sum against the total, writes `items`, sets status `review`.
-2. **Review**: host edits names/prices inline via `useMutations('items')`; `ownerField` means only the host's edits land.
+   `generateObject` with a Zod schema), runs the three-way check (below), writes `receipt` + `items`, sets status
+   `review`. Line prices are line totals (qty already applied).
+2. **Review**: host sees the receipt photo beside the numbers and edits names/prices/total inline via `useMutations`;
+   `ownerField` means only the host's edits land. The host enters the tip (15/18/20% shortcuts), or the optional
+   "amount charged to card", in which case tip = charged − printed total.
+   - **Three-way check:** lines sum to the printed subtotal, and subtotal + tax = printed total. Checking both says
+     *where* a misread is: a bad total/tax is highlighted separately from a bad line.
+   - **Mismatch:** a banner shows "Lines add up to $X; receipt says $Y, off by $Z". The host fixes a line or the
+     total, or taps "Add $Z adjustment". Sharing is allowed while mismatched; locking is not.
 3. **Live claiming**: friends open `/b/<billId>`, sign in, join (`participants` row). Tapping creates/removes a
    `claims` row; every phone updates in milliseconds. `usePresenceRoom('bill:<id>')` shows who's still picking.
-   Friends who won't sign in can be added as guests by the host, who taps for them.
-4. **Lock and settle** (`lockBill`, host-only): runs `computeShares`, refuses if anything is unclaimed, writes
-   `shares`, sets `locked`. Each person sees their total, prefilled pay links, and an "I paid" toggle.
+   Friends who won't sign in (stretch): the host adds them with `addGuest` and taps for them via `claimForGuest`
+   (host-only actions that check the caller is the bill's host). Guests live in their own `guests` collection and
+   their claims in `guestClaims`, so `participants` and `claims` keep their forgery protection. (`userBound` stamps
+   the writer's id even on server-action writes, so guests can't be `participants` rows written by the host.)
+4. **Lock and settle** (`lockBill`, host-only): refuses if anything is unclaimed, or unless items + tax + adjustments
+   equal the printed total to the cent (and, when `chargedCents` is set, printed total + tip = charged). Merges
+   `claims` + `guestClaims`, runs `computeShares`, writes `shares`, sets `locked`. Each person sees their total, prefilled pay links, and an "I paid" toggle.
 5. **Reminders** (stretch): `nudgeUnpaid` emails unpaid participants via Resend; a daily cron does the same for
    bills locked >24h. Emails read server-side only.
 
@@ -80,7 +104,7 @@ Yjs (short structured fields fit records better).
 ## Security and cost controls
 
 - AI is owner-billed: sign-in required, 10 parses/user/day, ≤5 MB images, button disabled in flight.
-- Claim forgery blocked by `userBound` + `immutable` userId and `uniqueOn`.
+- Claim forgery blocked by `userBound` + `immutable` userId and `uniqueOn`; guest claims only via host-only actions.
 - Only the host edits items (`ownerField`); lock/nudge actions verify the caller is the host.
 - Final amounts come from the server-written `shares` snapshot.
 - Receipts in private `self` scope; emails never leave server actions; users directory stays `read: 'own'`.
@@ -88,19 +112,20 @@ Yjs (short structured fields fit records better).
 - No secrets in the repo.
 
 **Break-it tests (run on the deployed URL, record in writeup):** forge a claim for another user from the console,
-edit an item as a non-host, call `lockBill` as a non-host.
+edit an item as a non-host, call `lockBill` as a non-host, call `claimForGuest` as a non-host, write `guestClaims`
+from the console.
 
 ## Day-by-day plan
 
 | Day | Focus | Done when |
 | --- | --- | --- |
 | Thu Oct 1 (tonight) | Scaffold, install skill, first deploy; throwaway parse spike | A real receipt parses on the deployed app |
-| Fri Oct 2 | Schemas + permissions; upload → parseReceipt → review screen | Host goes from photo to a correct item list |
+| Fri Oct 2 | Schemas + permissions (incl. `receipt`, `guestClaims`); upload → parseReceipt → review screen with photo, three-way check, tip / amount charged | Host goes from photo to a correct, reconciled item list |
 | Sat Oct 3 | Join link, claims, presence; `computeShares` + tests by hand; 5 real receipts | Two phones claim live; shares sum to total |
-| Sun Oct 4 | `lockBill`, pay links, I-paid toggle, break-it tests; stretch if green | Full core path works on the deployed URL |
+| Sun Oct 4 | `lockBill` (with reconcile check), pay links, I-paid toggle, break-it tests; stretch if green (guests first) | Full core path works on the deployed URL |
 | Mon Oct 5 | Polish, states, README + writeup from AGENT_LOG, final deploy, submit ~5 PM PT | Submitted |
 
-If a day slips: cut nudges/cron first, then presence. Never cut break-it tests or the real-phone run.
+If a day slips: cut nudges/cron first, then guests, then presence. Never cut break-it tests or the real-phone run.
 
 ## Working with the agent
 
@@ -108,7 +133,8 @@ If a day slips: cut nudges/cron first, then presence. Never cut break-it tests o
 Playwright scaffolding.
 
 **I do or verify myself:**
-- [ ] Write `computeShares` + unit tests (rounding, shared items, zero tip, discount lines, pennies sum to total)
+- [ ] Write `computeShares` + unit tests (rounding, shared items, zero tip, discount lines, adjustment lines,
+      guest claimants, pennies sum to total)
 - [ ] Review every permissions block and `userBound`/`uniqueOn` line against this plan
 - [ ] Run the break-it tests on the deployed URL
 - [ ] Run the core path on two real phones with two accounts
@@ -124,7 +150,7 @@ Playwright scaffolding.
 | Image input via `createDeepSpaceAI` may not work as expected | Throwaway action: photo in, JSON out | Vision model via `integration.post` (check schema with `deepspace integrations info`) |
 | Uploads 401 locally until first deploy | Deploy right after scaffolding | Send base64 to the action, add R2 later |
 | Friends must sign in with Google/GitHub (public email signup closed) | Time the join flow on a phone | Host-added guests |
-| AI misreads long/crumpled receipts | Test 5 real receipts Saturday | Inline editing + "doesn't add up" warning |
+| AI misreads long/crumpled receipts, or the total | Test 5 real receipts Saturday | Three-way check, photo beside numbers, editable total, adjustment line, optional amount charged |
 | Rounding drift | Unit tests on `computeShares` | Leftover pennies to host |
 
 ## Mockups
