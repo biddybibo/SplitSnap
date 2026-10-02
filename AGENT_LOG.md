@@ -47,3 +47,4 @@ One entry per session: what I asked for, what the agent produced, what I verifie
 - E2E on deployed /spike v2 (receipt #3 Westin / Lona, 6.2 s): bill-room writes confirmed by read-back; AI read
   correctly. Bug found: 18% service charge saved as an item, so both checks falsely failed. Fix: `fees[]` in the
   AI schema, `fee` item kind (split by subtotal like tax), check = subtotal + fees + tax + tip. Test case #3 added.
+  Re-test after fix (Westin, 3.4 s): service charge saved as `fee`; both checks true, offByCents 0. Slice 2 verified e2e.
