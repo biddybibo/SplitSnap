@@ -7,7 +7,6 @@
 
 import { useEffect } from 'react'
 import { useAsyncResource } from 'deepspace'
-import { Logo } from '@/components/Logo'
 import { formatCents } from '@/lib/money'
 import { AVATAR_COLORS } from '@/lib/people'
 import { rememberReturnPath } from '@/lib/returnTo'
@@ -72,8 +71,6 @@ export function JoinPreview({ billId, path }: { billId: string; path: string }) 
 
   return (
     <div className="mx-auto flex min-h-full w-full max-w-md flex-col gap-[18px] px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-4">
-      <Logo size={26} />
-
       {preview.status === 'error' && preview.error === 'not-found' ? (
         <p className="text-muted-foreground">This bill link doesn&apos;t exist or has expired. Ask whoever sent it for a new one.</p>
       ) : !p ? (
