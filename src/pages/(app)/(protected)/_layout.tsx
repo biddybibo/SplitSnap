@@ -17,6 +17,7 @@ import { useState } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { AuthGate, AuthOverlay } from 'deepspace'
 import { Button } from '@/components/ui'
+import { JoinPreview } from '@/components/bill/JoinPreview'
 import { rememberReturnPath } from '@/lib/returnTo'
 
 export default function ProtectedLayout() {
@@ -30,6 +31,9 @@ export default function ProtectedLayout() {
 function SignedOutPanel() {
   const [showAuthModal, setShowAuthModal] = useState(false)
   const { pathname } = useLocation()
+  // A shared bill link gets the "you've been invited" preview instead of a generic sign-in wall.
+  const billMatch = /^\/b\/([0-9a-f-]{36})$/.exec(pathname)
+  if (billMatch) return <JoinPreview billId={billMatch[1]} path={pathname} />
 
   return (
     <div className="flex min-h-[60vh] items-center justify-center px-6 py-20">

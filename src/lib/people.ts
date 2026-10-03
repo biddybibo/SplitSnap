@@ -2,7 +2,7 @@
  * Avatar colors from the mockup palette, picked deterministically from a user id
  * so a person keeps one color on every phone. All pass 4.5:1 with white initials.
  */
-const AVATAR_COLORS = ['#1F5FD1', '#8A3FB8', '#1F7A4D', '#B54708', '#0E7490', '#BE185D']
+export const AVATAR_COLORS = ['#1F5FD1', '#8A3FB8', '#1F7A4D', '#B54708', '#0E7490', '#BE185D']
 
 export function avatarColor(id: string): string {
   let h = 0

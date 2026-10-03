@@ -177,3 +177,8 @@ One entry per session: what I asked for, what the agent produced, what I verifie
   claims.units (own-writable); computeShares splits by units when every claim on a line has one (tests incl. the
   randomized check); lockBill + lock button refuse partly assigned count lines; taps on count lines open the sheet.
   81/81 unit, 8/8 runtime.
+- Part 3 — friend opens the link: unauthenticated `GET /api/public/bills/:id` (`src/server/public-routes.ts`;
+  strict UUID; returns host first name + color index, restaurant, date, total, item count, first 4 items with
+  claimer initials, who's picking — no ids, emails, per-person amounts, handles or photo; no-store). `JoinPreview`
+  replaces the generic sign-in wall on /b/<id>: "Maya invited you to split", live "X and Y are picking" (8 s
+  refresh), Continue with Google / GitHub straight back to the bill. 81/81 unit, 8/8 runtime.
