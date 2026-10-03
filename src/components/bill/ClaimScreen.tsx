@@ -198,8 +198,6 @@ export function ClaimScreen({ billId }: { billId: string }) {
 
       {isHost && (
         <HostPanel
-          section="summary"
-          billId={billId}
           meId={userId}
           lines={lines}
           byLine={byLine}
@@ -277,19 +275,6 @@ export function ClaimScreen({ billId }: { billId: string }) {
           )
         })}
       </ul>
-
-      {isHost && (
-        <HostPanel
-          section="unclaimed"
-          billId={billId}
-          meId={userId}
-          lines={lines}
-          byLine={byLine}
-          people={people}
-          hereIds={hereIds}
-          claimCounts={claimCounts}
-        />
-      )}
 
       <footer className="mt-2 flex flex-col gap-2.5 border-t border-border bg-card px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-3.5">
         <div className="flex items-baseline justify-between gap-3">

@@ -182,3 +182,6 @@ One entry per session: what I asked for, what the agent produced, what I verifie
   claimer initials, who's picking — no ids, emails, per-person amounts, handles or photo; no-store). `JoinPreview`
   replaces the generic sign-in wall on /b/<id>: "Maya invited you to split", live "X and Y are picking" (8 s
   refresh), Continue with Google / GitHub straight back to the bill. 81/81 unit, 8/8 runtime.
+- Host view tweak (my call): moved "Nobody claimed" under the host's own items, then removed it as redundant —
+  each card already says "Nobody yet". Host assigns from the item's split sheet (same host-only assignItem);
+  the progress card now says so.
