@@ -110,6 +110,27 @@ describe('computeShares', () => {
     expect(sum(shares)).toBe(4610)
   })
 
+  it('splits by how many when every claim on a line has units', () => {
+    // 3 tacos for $14.50: Roy had 2, Dev had 1 → $9.67 and $4.83 (host Maya takes no rounding here).
+    const lines = [line('tacos', 1450)]
+    const s = byUser(computeShares(lines, [{ itemId: 'tacos', userId: 'roy', units: 2 }, { itemId: 'tacos', userId: 'dev', units: 1 }], 'maya'))
+    expect(s.roy.subtotalCents).toBe(967)
+    expect(s.dev.subtotalCents).toBe(483)
+    expect(s.maya.subtotalCents).toBe(0)
+  })
+
+  it('falls back to an even split when only some claims on a line have units', () => {
+    const lines = [line('tacos', 1500)]
+    const s = byUser(computeShares(lines, [{ itemId: 'tacos', userId: 'a', units: 2 }, { itemId: 'tacos', userId: 'b' }], 'host'))
+    expect([s.a.subtotalCents, s.b.subtotalCents]).toEqual([750, 750])
+  })
+
+  it('ignores invalid units (zero, negative, fractional) by splitting evenly', () => {
+    const lines = [line('x', 900)]
+    const s = byUser(computeShares(lines, [{ itemId: 'x', userId: 'a', units: 0 }, { itemId: 'x', userId: 'b', units: 1.5 }], 'host'))
+    expect([s.a.subtotalCents, s.b.subtotalCents]).toEqual([450, 450])
+  })
+
   it('treats guest claimants like anyone else', () => {
     const shares = computeShares(
       [line('a', 1000), line('tip', 200, 'tip')],
@@ -166,9 +187,12 @@ describe('computeShares', () => {
         ...(rand() < 0.3 ? [line('adj', int(-300, 300), 'adjustment')] : []),
       ]
       // Every claimable line gets 1+ claimants, as lockBill requires.
-      const claims = items.flatMap((it) => {
+      const claims: ShareClaim[] = items.flatMap((it) => {
         const who = people.filter(() => rand() < 0.4)
-        return (who.length ? who : [people[int(0, people.length - 1)]]).map((p) => claim(it.id, p))
+        const byUnits = rand() < 0.3 // "by how many" on about 30% of lines
+        return (who.length ? who : [people[int(0, people.length - 1)]]).map((p) =>
+          byUnits ? { itemId: it.id, userId: p, units: int(1, 3) } : claim(it.id, p),
+        )
       })
       const all = [...items, ...extras]
       const shares = computeShares(all, claims, 'host')
@@ -182,9 +206,12 @@ describe('computeShares', () => {
       const subtotal = items.reduce((s, l) => s + l.priceCents, 0)
       for (const s of shares.filter((x) => x.userId !== 'host')) {
         const exactSub = items.reduce((acc, it) => {
-          const who = claims.filter((c) => c.itemId === it.id).map((c) => c.userId)
-          const unique = [...new Set(who)]
-          return unique.includes(s.userId) ? acc + it.priceCents / unique.length : acc
+          const onLine = claims.filter((c) => c.itemId === it.id)
+          const byUnits = onLine.every((c) => typeof c.units === 'number')
+          const weight = (c: ShareClaim) => (byUnits ? c.units! : 1)
+          const total = onLine.reduce((t, c) => t + weight(c), 0)
+          const mine = onLine.find((c) => c.userId === s.userId)
+          return mine ? acc + (it.priceCents * weight(mine)) / total : acc
         }, 0)
         expect(Math.abs(s.subtotalCents - exactSub)).toBeLessThanOrEqual(0.5 + 1e-9)
         if (subtotal > 0) {

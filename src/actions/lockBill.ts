@@ -15,8 +15,8 @@ import { createActionTools } from '../server/action-tools'
 import type { Env } from '../../worker'
 
 type BillRow = { hostId: string; status: string }
-type ItemRow = { kind: LineKind; priceCents: number }
-type ClaimRow = { itemId: string; userId: string }
+type ItemRow = { kind: LineKind; priceCents: number; qty?: number; name?: string }
+type ClaimRow = { itemId: string; userId: string; units?: number | null }
 type GuestClaimRow = { itemId: string; guestId: string }
 type ReceiptRow = {
   printedSubtotalCents: number | null
@@ -56,7 +56,7 @@ export const lockBill: ActionHandler<Env> = async ({ userId, params, tools, env,
     priceCents: r.data.priceCents,
   }))
   const allClaims: ShareClaim[] = [
-    ...claims.data.records.map((r) => ({ itemId: r.data.itemId, userId: r.data.userId })),
+    ...claims.data.records.map((r) => ({ itemId: r.data.itemId, userId: r.data.userId, units: r.data.units ?? null })),
     ...guestClaims.data.records.map((r) => ({ itemId: r.data.itemId, userId: `guest:${r.data.guestId}` })),
   ]
 
@@ -64,6 +64,17 @@ export const lockBill: ActionHandler<Env> = async ({ userId, params, tools, env,
   const unclaimed = lines.filter((l) => (l.kind === 'item' || l.kind === 'discount') && !claimedIds.has(l.id))
   if (unclaimed.length > 0) {
     return { success: false, error: `${unclaimed.length} item${unclaimed.length === 1 ? ' is' : 's are'} still unclaimed` }
+  }
+
+  // "By how many" lines must have every unit assigned (3 of 3 tacos), or the split isn't final.
+  for (const item of items.data.records) {
+    const onLine = allClaims.filter((c) => c.itemId === item.recordId)
+    if (onLine.length === 0 || !onLine.every((c) => typeof c.units === 'number' && c.units > 0)) continue
+    const assigned = onLine.reduce((s, c) => s + (c.units ?? 0), 0)
+    const qty = item.data.qty ?? 1
+    if (assigned !== qty) {
+      return { success: false, error: `${item.data.name ?? 'An item'}: ${assigned} of ${qty} assigned` }
+    }
   }
 
   const r = receipt.data.record.data

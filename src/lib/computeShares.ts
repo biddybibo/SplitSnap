@@ -5,8 +5,9 @@
  * fractions), never floating point.
  *
  * Rules (CLAUDE.md):
- * 1. `item` and `discount` lines are claimed; each is split evenly among the
- *    people who claimed it. That's each person's subtotal.
+ * 1. `item` and `discount` lines are claimed. A line splits evenly among the
+ *    people who claimed it — unless every claim on it carries `units` ("2 of the
+ *    3 tacos"), in which case it splits by units. That's each person's subtotal.
  * 2. `fee`, `tax`, `tip` and `adjustment` lines are split in proportion to each
  *    person's subtotal (their share of the whole bill's food).
  * 3. Everyone except the host is rounded to the nearest cent, per category; the
@@ -36,6 +37,8 @@ export interface ShareClaim {
   itemId: string
   /** A user id, or `guest:<guestId>` for a host-added guest. */
   userId: string
+  /** "By how many": this person's count of the line's qty. Used only when every claim on the line has one. */
+  units?: number | null
 }
 
 export interface Share {
@@ -85,13 +88,23 @@ export function computeShares(lines: ShareLine[], claims: ShareClaim[], hostId: 
   const claimable = lines.filter((l) => l.kind === 'item' || l.kind === 'discount')
   const claimableIds = new Set(claimable.map((l) => l.id))
 
-  // Claimants per line, deduplicated, ignoring claims on lines that can't be claimed (or no longer exist).
-  const claimantsByLine = new Map<string, string[]>()
+  // Claimants per line with their weight, deduplicated (first claim wins), ignoring claims on lines that
+  // can't be claimed (or no longer exist). Weight is `units` when every claim on the line has a positive
+  // integer count, otherwise 1 each (an even split).
+  const claimantsByLine = new Map<string, { userId: string; units: number | null }[]>()
   for (const c of claims) {
     if (!claimableIds.has(c.itemId)) continue
     const list = claimantsByLine.get(c.itemId) ?? []
-    if (!list.includes(c.userId)) list.push(c.userId)
+    if (!list.some((x) => x.userId === c.userId)) {
+      const u = c.units
+      list.push({ userId: c.userId, units: typeof u === 'number' && Number.isInteger(u) && u > 0 ? u : null })
+    }
     claimantsByLine.set(c.itemId, list)
+  }
+  const weightsByLine = new Map<string, { userId: string; weight: bigint }[]>()
+  for (const [lineId, list] of claimantsByLine) {
+    const byUnits = list.every((x) => x.units !== null)
+    weightsByLine.set(lineId, list.map((x) => ({ userId: x.userId, weight: BigInt(byUnits ? x.units! : 1) })))
   }
 
   // Output order: host first, then everyone in the order they first claimed.
@@ -100,10 +113,10 @@ export function computeShares(lines: ShareLine[], claims: ShareClaim[], hostId: 
     if (claimableIds.has(c.itemId) && !people.includes(c.userId)) people.push(c.userId)
   }
 
-  // Exact subtotals as fractions over a common denominator D = lcm(claimant counts).
+  // Exact subtotals as fractions over a common denominator D = lcm(each line's total weight).
   let D = 1n
-  for (const list of claimantsByLine.values()) {
-    const n = BigInt(list.length)
+  for (const list of weightsByLine.values()) {
+    const n = list.reduce((s, x) => s + x.weight, 0n)
     D = (D * n) / gcd(D, n)
   }
   const subNum = new Map<string, bigint>(people.map((p) => [p, 0n]))
@@ -112,11 +125,12 @@ export function computeShares(lines: ShareLine[], claims: ShareClaim[], hostId: 
   for (const line of claimable) {
     const price = BigInt(line.priceCents)
     totalSubNum += price * D
-    const claimants = claimantsByLine.get(line.id)
+    const claimants = weightsByLine.get(line.id)
     if (!claimants) continue
     claimedSubNum += price * D
-    const each = (price * D) / BigInt(claimants.length) // exact: D is a multiple of the count
-    for (const p of claimants) subNum.set(p, subNum.get(p)! + each)
+    const totalWeight = claimants.reduce((s, x) => s + x.weight, 0n)
+    const perWeight = (price * D) / totalWeight // exact: D is a multiple of every line's total weight
+    for (const c of claimants) subNum.set(c.userId, subNum.get(c.userId)! + perWeight * c.weight)
   }
 
   const shares = new Map<string, Share>(

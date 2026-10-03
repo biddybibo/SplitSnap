@@ -112,14 +112,16 @@ export const claimsSchema: CollectionSchema = {
   columns: [
     { name: 'itemId', storage: 'text', interpretation: 'plain', required: true },
     { name: 'userId', storage: 'text', interpretation: 'plain', userBound: true, immutable: true },
+    // "By how many": this person's count of the line's qty (null = even split). Own claim only.
+    { name: 'units', storage: 'number', interpretation: 'plain' },
   ],
   uniqueOn: ['itemId', 'userId'],
   ownerField: 'userId',
   permissions: {
     '*': NO_ACCESS,
     viewer: READ_ONLY,
-    member: { read: true, create: true, update: 'own', delete: 'own', writableFields: ['itemId'] },
-    admin: { read: true, create: true, update: 'own', delete: 'own', writableFields: ['itemId'] },
+    member: { read: true, create: true, update: 'own', delete: 'own', writableFields: ['itemId', 'units'] },
+    admin: { read: true, create: true, update: 'own', delete: 'own', writableFields: ['itemId', 'units'] },
   },
 }
 

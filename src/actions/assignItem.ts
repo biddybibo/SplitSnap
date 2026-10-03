@@ -1,0 +1,77 @@
+/**
+ * assignItem — host-only: decide who had a line ("Who had it?", "Split with
+ * everyone", or a full "by how many" split). Replaces every claim on the line.
+ *
+ * Normal claims stay self-only (userBound + immutable userId). This action is the
+ * one sanctioned exception: it verifies the caller is the bill's host, that every
+ * target already has a seat at the table, and then writes each claim *as that
+ * person* (the room stamps their id), so the rows look exactly like their own taps.
+ */
+
+import type { ActionHandler } from 'deepspace/worker'
+import { createActionTools } from '../server/action-tools'
+import type { Env } from '../../worker'
+
+type BillRow = { hostId: string }
+type ItemRow = { kind: string; qty?: number }
+type Assignment = { userId: string; units?: number }
+
+export const assignItem: ActionHandler<Env> = async ({ userId, params, tools, env, callerJwt }) => {
+  const { billId, itemId, assignments } = params
+  if (typeof billId !== 'string' || !/^[0-9a-f-]{36}$/.test(billId)) return { success: false, error: 'Invalid bill' }
+  if (typeof itemId !== 'string' || itemId.length > 100) return { success: false, error: 'Invalid item' }
+  if (!Array.isArray(assignments) || assignments.length > 50) return { success: false, error: 'Invalid assignments' }
+
+  const list: Assignment[] = []
+  for (const a of assignments as unknown[]) {
+    if (typeof a !== 'object' || a === null) return { success: false, error: 'Invalid assignment' }
+    const { userId: who, units } = a as Record<string, unknown>
+    if (typeof who !== 'string' || who.length > 100) return { success: false, error: 'Invalid person' }
+    if (units !== undefined && (typeof units !== 'number' || !Number.isInteger(units) || units < 1 || units > 999)) {
+      return { success: false, error: 'Counts must be whole numbers' }
+    }
+    if (list.some((x) => x.userId === who)) return { success: false, error: 'Each person can appear once' }
+    list.push({ userId: who, units: units as number | undefined })
+  }
+
+  const bill = await tools.get<BillRow>('bills', billId)
+  if (!bill.success) return { success: false, error: 'Bill not found' }
+  if (bill.data.record.data.hostId !== userId) return { success: false, error: 'Only the host can assign items' }
+
+  const asHost = createActionTools(env, userId, callerJwt, `bill:${billId}`)
+  const [receipt, item, seats] = await Promise.all([
+    asHost.get<{ lockedAt?: string }>('receipt', 'receipt'),
+    asHost.get<ItemRow>('items', itemId),
+    asHost.query<{ userId: string }>('participants', { limit: 500 }),
+  ])
+  if (!receipt.success || !seats.success) return { success: false, error: 'Could not read the bill; try again' }
+  if (receipt.data.record.data.lockedAt) return { success: false, error: 'This bill is locked' }
+  if (!item.success) return { success: false, error: 'Item not found' }
+  const kind = item.data.record.data.kind
+  if (kind !== 'item' && kind !== 'discount') return { success: false, error: 'Only items can be assigned' }
+
+  const seated = new Set(seats.data.records.map((r) => r.data.userId))
+  if (list.some((a) => !seated.has(a.userId))) return { success: false, error: 'Everyone assigned must be at the table' }
+
+  const withUnits = list.filter((a) => a.units !== undefined).length
+  if (withUnits !== 0 && withUnits !== list.length) return { success: false, error: 'Give everyone a count, or no one' }
+  const qty = item.data.record.data.qty ?? 1
+  if (withUnits > 0 && list.reduce((s, a) => s + (a.units ?? 0), 0) !== qty) {
+    return { success: false, error: `Counts must add up to ${qty}` }
+  }
+
+  // Replace: clear the line's claims (paged, as deleteWhere caps each call), then write the new set.
+  for (;;) {
+    const cleared = await asHost.deleteWhere('claims', { itemId }, 500)
+    if (!cleared.success) return { success: false, error: 'Could not update the claims; try again' }
+    if (cleared.data.deleted < 500) break
+  }
+  for (const a of list) {
+    // Acting as the target: claims.userId is userBound, so the room stamps *their* id on the row.
+    const asThem = createActionTools(env, a.userId, callerJwt, `bill:${billId}`)
+    const made = await asThem.create('claims', { itemId, units: a.units ?? null })
+    if (!made.success) return { success: false, error: 'Could not save every claim; try again' }
+  }
+  console.info(`[assignItem] host=${userId} bill=${billId} item=${itemId} people=${list.length}`)
+  return { success: true, data: { assigned: list.length } }
+}

@@ -169,3 +169,11 @@ One entry per session: what I asked for, what the agent produced, what I verifie
   the $X" (only when lines are short) → `hostAdjustment` line charged to the host alone (computeShares + reconcile
   + tests). 77/77 unit, 8/8 runtime.
 - Verified / changed: 
+- Part 2 — host view + split by how many: `assignItem` (host-only; targets must be seated; writes each claim *as*
+  that person so userBound stamps them; replaces the line's claims; counts must cover qty or be absent; refuses
+  when locked). `HostPanel` on the host's claim screen (Host badge, "You paid $X", progress bar, People with
+  Picked N / Still picking / Hasn't picked yet, "Nobody claimed → Who had it?" chips incl. "Split with everyone",
+  Undo). `SplitSheet` (Split evenly / By how many; host edits everyone via assignItem, others only their own row).
+  claims.units (own-writable); computeShares splits by units when every claim on a line has one (tests incl. the
+  randomized check); lockBill + lock button refuse partly assigned count lines; taps on count lines open the sheet.
+  81/81 unit, 8/8 runtime.

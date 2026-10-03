@@ -40,7 +40,7 @@ export function SplitPreview({ billId }: { billId: string }) {
   const extrasCents = check.grandTotalCents - check.claimableCents
   const shares = computeShares(
     items.map((i) => ({ id: i.recordId, kind: i.data.kind, priceCents: i.data.priceCents })),
-    claims,
+    claims.map((c) => ({ itemId: c.itemId, userId: c.userId, units: c.units ?? null })),
     receipt.hostId,
   )
   const shareOf = (id: string) => shares.find((s) => s.userId === id)

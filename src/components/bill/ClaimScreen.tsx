@@ -1,6 +1,7 @@
 /**
  * Claim screen: everyone at the table taps what they had. Shared lines show
- * every claimant and split evenly; "Your share so far" sums your portions.
+ * every claimant; the split button opens "split evenly / by how many". The host
+ * also gets the host panel (progress, people, "Who had it?") and the lock.
  *
  * Claims are written straight to the bill room. The room stamps the caller's id
  * on each claim (userBound + immutable) and allows one per person per item
@@ -10,7 +11,7 @@
 import { useCallback, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth, useMutations, usePresenceRoom, useQuery } from 'deepspace'
-import { Pencil } from 'lucide-react'
+import { Pencil, SplitSquareHorizontal } from 'lucide-react'
 import { Button, ConfirmModal, buttonVariants, useToast } from '@/components/ui'
 import { callAction } from '@/lib/actions'
 import { claimsByLine, unclaimedCount, type ClaimRow } from '@/lib/claims'
@@ -18,7 +19,9 @@ import { computeShares } from '@/lib/computeShares'
 import { formatCents } from '@/lib/money'
 import { reconcile } from '@/lib/reconcile'
 import { cn } from '@/lib/utils'
+import { HostPanel } from './HostPanel'
 import { InviteSheet } from './InviteSheet'
+import { SplitSheet } from './SplitSheet'
 import { Avatar, AvatarStack, JoinCard, type Participant } from './Table'
 import type { Item, ReceiptRow } from './types'
 
@@ -28,7 +31,7 @@ export function ClaimScreen({ billId }: { billId: string }) {
   const itemsQuery = useQuery<Item>('items', { orderBy: 'createdAt', orderDir: 'asc' })
   const claimsQuery = useQuery<ClaimRow>('claims')
   const participantsQuery = useQuery<Participant>('participants', { orderBy: 'createdAt', orderDir: 'asc' })
-  const claimMutations = useMutations<{ itemId: string }>('claims')
+  const claimMutations = useMutations<{ itemId: string; units?: number | null }>('claims')
   const { peers } = usePresenceRoom(`bill:${billId}`)
   const toast = useToast()
   const [pending, setPending] = useState<Set<string>>(new Set())
@@ -37,6 +40,7 @@ export function ClaimScreen({ billId }: { billId: string }) {
   const [inviteOpen, setInviteOpen] = useState(params.get('invite') === '1')
   const [confirmLock, setConfirmLock] = useState(false)
   const [locking, setLocking] = useState(false)
+  const [splitLineId, setSplitLineId] = useState<string | null>(null)
   const closeInvite = useCallback(() => {
     setInviteOpen(false)
     if (params.has('invite')) setParams({}, { replace: true })
@@ -56,12 +60,12 @@ export function ClaimScreen({ billId }: { billId: string }) {
 
   const lines = itemsQuery.records
     .filter((i) => i.data.kind === 'item' || i.data.kind === 'discount')
-    .map((i) => ({ id: i.recordId, priceCents: i.data.priceCents, name: i.data.name, qty: i.data.qty }))
+    .map((i) => ({ id: i.recordId, priceCents: i.data.priceCents, name: i.data.name, qty: Math.max(1, i.data.qty ?? 1) }))
   const claims = claimsQuery.records
   const byLine = claimsByLine(lines, claims.map((c) => c.data))
   const shares = computeShares(
     itemsQuery.records.map((i) => ({ id: i.recordId, kind: i.data.kind, priceCents: i.data.priceCents })),
-    claims.map((c) => c.data),
+    claims.map((c) => ({ itemId: c.data.itemId, userId: c.data.userId, units: c.data.units ?? null })),
     receipt.hostId,
   )
   const myShare = shares.find((s) => s.userId === userId)
@@ -83,12 +87,21 @@ export function ClaimScreen({ billId }: { billId: string }) {
     },
   )
   const billTotalCents = billCheck.grandTotalCents
-  const canLock = isHost && unclaimed === 0 && billCheck.reconciled && lines.length > 0
+  // "By how many" lines that don't have every unit assigned yet block the lock (lockBill checks the same).
+  const partlySplit = lines.filter((l) => {
+    const c = byLine.get(l.id)!
+    return c.byUnits && c.unitsAssigned !== l.qty
+  })
+  const canLock = isHost && unclaimed === 0 && partlySplit.length === 0 && billCheck.reconciled && lines.length > 0
   const lockHint = !billCheck.reconciled
     ? 'The receipt doesn’t add up yet. Tap Edit to fix it.'
     : unclaimed > 0
       ? null // the unclaimed warning above already says why
-      : 'Everything’s claimed. Locking makes the totals final.'
+      : partlySplit.length > 0
+        ? `${partlySplit[0].name}: ${byLine.get(partlySplit[0].id)!.unitsAssigned} of ${partlySplit[0].qty} assigned.`
+        : 'Locking makes totals final. Picks can’t change after this.'
+  const claimCounts = new Map<string, number>()
+  for (const c of claims) claimCounts.set(c.data.userId, (claimCounts.get(c.data.userId) ?? 0) + 1)
 
   async function lock() {
     setLocking(true)
@@ -112,6 +125,11 @@ export function ClaimScreen({ billId }: { billId: string }) {
 
   async function toggle(lineId: string) {
     if (!canClaim || pending.has(lineId)) return
+    // A line split by count needs a count, not a plain tap, or it would fall back to an even split.
+    if (byLine.get(lineId)?.byUnits) {
+      setSplitLineId(lineId)
+      return
+    }
     setPending((s) => new Set(s).add(lineId))
     try {
       const mine = claims.find((c) => c.data.itemId === lineId && c.data.userId === userId)
@@ -134,9 +152,16 @@ export function ClaimScreen({ billId }: { billId: string }) {
       <header className="flex flex-col gap-2.5 px-5 pb-3 pt-2">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 flex-col gap-0.5">
-            <h1 className="truncate font-display text-xl font-semibold">{receipt.merchant}</h1>
+            <span className="flex items-center gap-2">
+              <h1 className="truncate font-display text-xl font-semibold">{receipt.merchant}</h1>
+              {isHost && (
+                <span className="rounded-full bg-[#F1E6F8] px-2 py-0.5 text-[11.5px] font-semibold text-[#6B2E91]">Host</span>
+              )}
+            </span>
             <p className="text-[13px] text-muted-foreground">
-              {isHost ? 'You’re hosting' : `Hosted by ${hostName}`} · tap what you had
+              {isHost
+                ? `You paid ${formatCents(billTotalCents)} · lock when everyone’s done`
+                : `Hosted by ${hostName} · tap what you had`}
             </p>
           </div>
           <div className="flex shrink-0 gap-2">
@@ -171,6 +196,19 @@ export function ClaimScreen({ billId }: { billId: string }) {
         )}
       </header>
 
+      {isHost && (
+        <HostPanel
+          billId={billId}
+          meId={userId}
+          lines={lines}
+          byLine={byLine}
+          people={people}
+          hereIds={hereIds}
+          claimCounts={claimCounts}
+        />
+      )}
+      {isHost && <h2 className="px-5 pb-2 text-[13px] font-semibold uppercase tracking-[0.6px] text-muted-foreground">What you had</h2>}
+
       {!me && participantsQuery.status === 'ready' && (
         <div className="px-5 pb-3">
           <JoinCard billId={billId} hostName={hostName} />
@@ -184,7 +222,7 @@ export function ClaimScreen({ billId }: { billId: string }) {
           // Me first, then everyone else in the order they tapped.
           const claimants = mine ? [userId!, ...c.claimantIds.filter((id) => id !== userId)] : c.claimantIds
           return (
-            <li key={line.id}>
+            <li key={line.id} className="flex items-stretch gap-1.5">
               <button
                 type="button"
                 onClick={() => toggle(line.id)}
@@ -206,18 +244,34 @@ export function ClaimScreen({ billId }: { billId: string }) {
                     {claimants.map((id) => (
                       <Avatar key={id} id={id} name={nameOf(id)} size={22} />
                     ))}
-                    <span className={cn('text-[12.5px]', claimants.length === 0 ? 'text-warning' : 'text-muted-foreground')}>
-                      {claimants.length === 0 ? 'Nobody yet' : claimants.length > 1 ? `Split ${claimants.length} ways` : ''}
+                    <span className={cn('text-[12.5px]', claimants.length === 0 || (c.byUnits && c.unitsAssigned !== line.qty) ? 'text-warning' : 'text-muted-foreground')}>
+                      {claimants.length === 0
+                        ? 'Nobody yet'
+                        : c.byUnits
+                          ? `${c.unitsAssigned} of ${line.qty} assigned`
+                          : claimants.length > 1
+                            ? `Split ${claimants.length} ways`
+                            : ''}
                     </span>
                   </span>
                 </span>
                 <span className="flex shrink-0 flex-col items-end gap-0.5">
                   <span className="font-mono text-sm tabular-nums">{formatCents(line.priceCents)}</span>
-                  {mine && c.portionCents !== null && (
-                    <span className="font-mono text-xs text-primary tabular-nums">you {formatCents(c.portionCents)}</span>
+                  {mine && c.portions.has(userId!) && (
+                    <span className="font-mono text-xs text-primary tabular-nums">you {formatCents(c.portions.get(userId!)!)}</span>
                   )}
                 </span>
               </button>
+              {(me || isHost) && (
+                <button
+                  type="button"
+                  onClick={() => setSplitLineId(line.id)}
+                  aria-label={`Split ${line.name}`}
+                  className="flex w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground hover:bg-accent"
+                >
+                  <SplitSquareHorizontal className="size-[18px]" />
+                </button>
+              )}
             </li>
           )
         })}
@@ -240,7 +294,7 @@ export function ClaimScreen({ billId }: { billId: string }) {
         {isHost && (
           <>
             <Button size="lg" className="h-12 text-base" disabled={!canLock || locking} onClick={() => setConfirmLock(true)}>
-              {locking ? 'Locking…' : 'Lock the bill'}
+              {locking ? 'Locking…' : 'Lock bill and send totals'}
             </Button>
             {lockHint && <p className="-mt-1 text-center text-[12.5px] text-muted-foreground">{lockHint}</p>}
           </>
@@ -267,6 +321,18 @@ export function ClaimScreen({ billId }: { billId: string }) {
         description={`Totals become final and everyone sees what they owe you. You can't edit prices or claims after this. Bill total: ${formatCents(billTotalCents)}.`}
         confirmText="Lock and send totals"
       />
+
+      {splitLineId && userId && lines.some((l) => l.id === splitLineId) && (
+        <SplitSheet
+          billId={billId}
+          line={lines.find((l) => l.id === splitLineId)!}
+          claims={claims}
+          people={people}
+          meId={userId}
+          isHost={isHost}
+          onClose={() => setSplitLineId(null)}
+        />
+      )}
 
       {inviteOpen && (
         <InviteSheet
