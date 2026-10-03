@@ -20,6 +20,8 @@ interface Line {
 }
 
 interface Props {
+  /** 'summary' = progress + people (above the host's own items); 'unclaimed' = "Who had it?" (below them). */
+  section: 'summary' | 'unclaimed'
   billId: string
   meId: string | null
   lines: Line[]
@@ -36,7 +38,7 @@ interface Undo {
   previous: { userId: string; units?: number }[]
 }
 
-export function HostPanel({ billId, meId, lines, byLine, people, hereIds, claimCounts }: Props) {
+export function HostPanel({ section, billId, meId, lines, byLine, people, hereIds, claimCounts }: Props) {
   const toast = useToast()
   const [busy, setBusy] = useState<string | null>(null)
   const [undo, setUndo] = useState<Undo | null>(null)
@@ -72,6 +74,59 @@ export function HostPanel({ billId, meId, lines, byLine, people, hereIds, claimC
     } finally {
       setBusy(null)
     }
+  }
+
+  if (section === 'unclaimed') {
+    if (unclaimed.length === 0 && !undo) return null
+    return (
+      <div className="flex flex-col gap-3.5 px-5 pb-4">
+        {unclaimed.length > 0 && (
+          <section className="flex flex-col gap-2">
+            <h2 className="text-[13px] font-semibold uppercase tracking-[0.6px] text-warning">Nobody claimed</h2>
+            {unclaimed.map((line) => (
+              <div key={line.id} className="flex flex-col gap-2.5 rounded-xl border-2 border-[#F2C9A3] bg-card px-3.5 py-3">
+                <div className="flex justify-between">
+                  <span className="font-medium">{line.name}</span>
+                  <span className="font-mono tabular-nums">{formatCents(line.priceCents)}</span>
+                </div>
+                <span className="text-[13px] text-muted-foreground">Who had it?</span>
+                <div className="flex flex-wrap gap-2">
+                  {people.map((p) => (
+                    <button
+                      key={p.userId}
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={() => assign(line, [p.userId], `${line.name} assigned to ${p.userId === meId ? 'you' : p.displayName}`)}
+                      className="h-10 rounded-full border border-input bg-card px-3 text-[13.5px] hover:bg-accent disabled:opacity-50"
+                    >
+                      {p.userId === meId ? 'Me' : p.displayName}
+                    </button>
+                  ))}
+                  {people.length > 1 && (
+                    <button
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={() => assign(line, people.map((p) => p.userId), `${line.name} split with everyone`)}
+                      className="h-10 rounded-full border border-primary bg-primary-soft px-3 text-[13.5px] font-semibold text-primary disabled:opacity-50"
+                    >
+                      Split with everyone
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </section>
+        )}
+        {undo && (
+          <div className="flex items-center justify-between rounded-xl border border-[#B7DCC8] bg-success-soft px-3.5 py-2.5">
+            <span className="text-sm font-medium text-success">{undo.note}</span>
+            <button type="button" disabled={busy !== null} onClick={undoLast} className="h-9 px-2.5 text-[13.5px] font-semibold text-success">
+              Undo
+            </button>
+          </div>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -128,57 +183,6 @@ export function HostPanel({ billId, meId, lines, byLine, people, hereIds, claimC
         </section>
       )}
 
-      {unclaimed.length > 0 && (
-        <section className="flex flex-col gap-2">
-          <h2 className="text-[13px] font-semibold uppercase tracking-[0.6px] text-warning">Nobody claimed</h2>
-          {unclaimed.map((line) => (
-            <div key={line.id} className="flex flex-col gap-2.5 rounded-xl border-2 border-[#F2C9A3] bg-card px-3.5 py-3">
-              <div className="flex justify-between">
-                <span className="font-medium">{line.name}</span>
-                <span className="font-mono tabular-nums">{formatCents(line.priceCents)}</span>
-              </div>
-              <span className="text-[13px] text-muted-foreground">Who had it?</span>
-              <div className="flex flex-wrap gap-2">
-                {people.map((p) => (
-                  <button
-                    key={p.userId}
-                    type="button"
-                    disabled={busy !== null}
-                    onClick={() => assign(line, [p.userId], `${line.name} assigned to ${p.userId === meId ? 'you' : p.displayName}`)}
-                    className="h-10 rounded-full border border-input bg-card px-3 text-[13.5px] hover:bg-accent disabled:opacity-50"
-                  >
-                    {p.userId === meId ? 'Me' : p.displayName}
-                  </button>
-                ))}
-                {people.length > 1 && (
-                  <button
-                    type="button"
-                    disabled={busy !== null}
-                    onClick={() => assign(line, people.map((p) => p.userId), `${line.name} split with everyone`)}
-                    className="h-10 rounded-full border border-primary bg-primary-soft px-3 text-[13.5px] font-semibold text-primary disabled:opacity-50"
-                  >
-                    Split with everyone
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </section>
-      )}
-
-      {undo && (
-        <div className="flex items-center justify-between rounded-xl border border-[#B7DCC8] bg-success-soft px-3.5 py-2.5">
-          <span className="text-sm font-medium text-success">{undo.note}</span>
-          <button
-            type="button"
-            disabled={busy !== null}
-            onClick={undoLast}
-            className="h-9 px-2.5 text-[13.5px] font-semibold text-success"
-          >
-            Undo
-          </button>
-        </div>
-      )}
     </div>
   )
 }
