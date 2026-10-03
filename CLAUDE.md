@@ -51,6 +51,18 @@ Full spec: `PLAN.md`. Read it before starting any new slice of work.
   re-stamp can never put a friend in `hostId`, and re-reads to survive two friends joining at once. The host calls
   it on first share to get their own participants row.
 - `addGuest` / `claimForGuest` (stretch): host-only. The only writers of `guests` and `guestClaims`.
+
+## Design decisions from the "gaps" boards (2026-10-02)
+- `assignItem` (host-only): writes claims on behalf of people already at the table ("Who had it?", "Split with
+  everyone"). Normal claims stay self-only. Non-host callers refused (break-it test).
+- Split by how many: claims carry optional `units`. If every claim on a line has units, the line splits by units
+  and lock requires units to cover the line's qty; otherwise it splits evenly. Each person sets their own units;
+  setting someone else's goes through a host-only action.
+- Public bill preview: unauthenticated `GET /api/public/bills/:id` returns only what the "Friend opens the link"
+  board shows (host first name, restaurant, total, item count, first items with claimer initials). Read-only.
+- "Share anyway, the host covers the difference": a `hostAdjustment` line charged to the host alone (not split
+  by subtotal). It reconciles the bill; friends pay only for what's on the lines.
+- AI flags uncertain lines (`flagged`, `flagNote` on items); editing the price clears the flag.
 - `nudgeUnpaid` (stretch): host-only, emails unpaid participants via `resend/send-email`. Emails never returned to client.
 
 ## Permissions (must hold server-side, not just in UI)
@@ -77,7 +89,7 @@ Full spec: `PLAN.md`. Read it before starting any new slice of work.
   everything but letters, digits and `- _ .` before saving.
 
 ## Out of scope
-Moving money in-app, multi-currency, uneven per-item splits, receipt history/analytics, native mobile app,
+Moving money in-app, multi-currency, receipt history/analytics, native mobile app,
 reading bank transactions. Stretch only if the core path works: host-added guests, Resend nudges, daily reminder
 cron, presence indicator. Future: "claim your spot" link for guests via the share sheet.
 

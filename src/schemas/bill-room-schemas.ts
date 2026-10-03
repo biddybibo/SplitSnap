@@ -77,9 +77,12 @@ export const itemsSchema: CollectionSchema = {
       name: 'kind',
       storage: 'text',
       // item/discount are claimed; fee/tax/tip/adjustment split by subtotal.
-      interpretation: { kind: 'select', options: ['item', 'tax', 'tip', 'discount', 'fee', 'adjustment'] },
+      interpretation: { kind: 'select', options: ['item', 'tax', 'tip', 'discount', 'fee', 'adjustment', 'hostAdjustment'] },
       default: 'item',
     },
+    // The AI wasn't sure about this line (smudged, cut off). Cleared when the host edits the price.
+    { name: 'flagged', storage: 'number', interpretation: { kind: 'boolean' }, default: 0 },
+    { name: 'flagNote', storage: 'text', interpretation: 'plain' },
     { name: 'hostId', storage: 'text', interpretation: 'plain', userBound: true, immutable: true },
   ],
   ownerField: 'hostId',
@@ -91,14 +94,14 @@ export const itemsSchema: CollectionSchema = {
       create: false,
       update: 'own',
       delete: 'own',
-      writableFields: ['name', 'qty', 'priceCents', 'kind'],
+      writableFields: ['name', 'qty', 'priceCents', 'kind', 'flagged'],
     },
     admin: {
       read: true,
       create: false,
       update: 'own',
       delete: 'own',
-      writableFields: ['name', 'qty', 'priceCents', 'kind'],
+      writableFields: ['name', 'qty', 'priceCents', 'kind', 'flagged'],
     },
   },
 }

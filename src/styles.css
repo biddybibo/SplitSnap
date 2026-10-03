@@ -243,3 +243,15 @@
     touch-action: manipulation;
   }
 }
+
+/* Reading-the-receipt scan line: sweeps down the photo and back. */
+@keyframes scan-sweep {
+  0% { top: 2%; }
+  100% { top: 96%; }
+}
+.animate-scan-sweep {
+  animation: scan-sweep 1.6s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-scan-sweep { animation: none; top: 50%; opacity: 0.6; }
+}

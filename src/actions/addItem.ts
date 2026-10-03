@@ -8,7 +8,7 @@ import type { ActionHandler } from 'deepspace/worker'
 import { createActionTools } from '../server/action-tools'
 import type { Env } from '../../worker'
 
-const KINDS = ['item', 'discount', 'fee', 'tip', 'adjustment'] as const
+const KINDS = ['item', 'discount', 'fee', 'tip', 'adjustment', 'hostAdjustment'] as const
 const MAX_ABS_CENTS = 10_000_000 // $100,000: far above any real bill, blocks absurd values
 
 export const addItem: ActionHandler<Env> = async ({ userId, params, tools, env, callerJwt }) => {

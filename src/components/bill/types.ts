@@ -5,6 +5,8 @@ export interface Item {
   qty: number
   priceCents: number
   kind: LineKind
+  flagged?: number
+  flagNote?: string
   hostId: string
 }
 

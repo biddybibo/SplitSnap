@@ -19,9 +19,12 @@
  *
  * If the food subtotal is zero or negative there is no fair proportion, so the
  * host carries the fees, tax, tip and adjustments.
+ *
+ * `hostAdjustment` lines ("share anyway, the host covers the difference") are
+ * charged to the host alone, in their adjustmentCents.
  */
 
-export type LineKind = 'item' | 'discount' | 'fee' | 'tax' | 'tip' | 'adjustment'
+export type LineKind = 'item' | 'discount' | 'fee' | 'tax' | 'tip' | 'adjustment' | 'hostAdjustment'
 
 export interface ShareLine {
   id: string
@@ -47,7 +50,7 @@ export interface Share {
 
 type Category = 'subtotalCents' | 'feesCents' | 'taxCents' | 'tipCents' | 'adjustmentCents'
 
-const EXTRA_CATEGORY: Record<Exclude<LineKind, 'item' | 'discount'>, Category> = {
+const EXTRA_CATEGORY: Record<Exclude<LineKind, 'item' | 'discount' | 'hostAdjustment'>, Category> = {
   fee: 'feesCents',
   tax: 'taxCents',
   tip: 'tipCents',
@@ -142,7 +145,7 @@ export function computeShares(lines: ShareLine[], claims: ShareClaim[], hostId: 
   // 2. Extras, one category at a time, in proportion to subtotal.
   const extraTotals = new Map<Category, bigint>()
   for (const line of lines) {
-    if (line.kind === 'item' || line.kind === 'discount') continue
+    if (line.kind === 'item' || line.kind === 'discount' || line.kind === 'hostAdjustment') continue
     const cat = EXTRA_CATEGORY[line.kind]
     extraTotals.set(cat, (extraTotals.get(cat) ?? 0n) + BigInt(line.priceCents))
   }
@@ -155,6 +158,11 @@ export function computeShares(lines: ShareLine[], claims: ShareClaim[], hostId: 
     // The part of this extra that belongs to claimed food (all of it once everything is claimed).
     const target = roundDiv(total * claimedSubNum, totalSubNum)
     allocate(cat, (p) => [total * subNum.get(p)!, totalSubNum], target)
+  }
+
+  // 3. The host's own "I'll cover the difference" lines: theirs alone.
+  for (const line of lines) {
+    if (line.kind === 'hostAdjustment') shares.get(hostId)!.adjustmentCents += line.priceCents
   }
 
   for (const s of shares.values()) {

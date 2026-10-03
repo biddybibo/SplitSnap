@@ -38,7 +38,7 @@ product with expense-system export.
 the guest signs in and their guest claims convert to normal claims.
 
 **Out of scope, on purpose:** moving money inside the app, multi-currency, item-level discounts beyond a negative
-line, uneven splits of one item, receipt history and analytics, a native mobile app, gambling or wagering of any kind (card roulette only picks who covers the bill), reading the host's bank
+line, receipt history and analytics, a native mobile app, gambling or wagering of any kind (card roulette only picks who covers the bill), reading the host's bank
 transactions to verify totals (bank-linking means financial-data consent and compliance, and the tipped charge
 usually posts 1–3 days later anyway — the host-entered "amount charged" field covers it).
 

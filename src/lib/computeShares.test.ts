@@ -101,6 +101,15 @@ describe('computeShares', () => {
     expect(s.host.adjustmentCents).toBe(-300)
   })
 
+  it('charges a host adjustment ("host covers the difference") to the host alone', () => {
+    const lines = [line('a', 3000), line('b', 1000), line('gap', 210, 'hostAdjustment'), line('tax', 400, 'tax')]
+    const shares = computeShares(lines, [claim('a', 'x'), claim('b', 'host')], 'host')
+    const s = byUser(shares)
+    expect(s.x).toMatchObject({ subtotalCents: 3000, taxCents: 300, adjustmentCents: 0, totalCents: 3300 })
+    expect(s.host).toMatchObject({ subtotalCents: 1000, taxCents: 100, adjustmentCents: 210, totalCents: 1310 })
+    expect(sum(shares)).toBe(4610)
+  })
+
   it('treats guest claimants like anyone else', () => {
     const shares = computeShares(
       [line('a', 1000), line('tip', 200, 'tip')],

@@ -7,7 +7,7 @@
  * lines hold whatever tip is actually being paid.
  */
 
-export type LineKind = 'item' | 'discount' | 'fee' | 'tax' | 'tip' | 'adjustment'
+export type LineKind = 'item' | 'discount' | 'fee' | 'tax' | 'tip' | 'adjustment' | 'hostAdjustment'
 
 export interface Line {
   kind: LineKind
@@ -28,7 +28,8 @@ export function reconcile(lines: Line[], printed: PrintedNumbers) {
   const claimableCents = sum(lines, ['item', 'discount'])
   const feesCents = sum(lines, ['fee'])
   const taxCents = sum(lines, ['tax'])
-  const adjustmentCents = sum(lines, ['adjustment'])
+  // Both kinds close the gap to the receipt; they differ only in who pays (computeShares).
+  const adjustmentCents = sum(lines, ['adjustment', 'hostAdjustment'])
   const tipCents = sum(lines, ['tip'])
 
   const preTipCents = claimableCents + feesCents + taxCents + adjustmentCents

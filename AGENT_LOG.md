@@ -157,3 +157,15 @@ One entry per session: what I asked for, what the agent produced, what I verifie
   "I paid" toggle on own participants row, the table with Paid / Not paid yet). payLinks rejects unsafe handles
   (tests). Pay-link URL formats need a real-phone check. 75/75 unit, 8/8 runtime.
 - Verified / changed: 
+
+## 2026-10-02 — "Gaps" boards, part 1: scanning + doesn't add up
+- Asked: build the 5 new boards; decisions: host-only assign, build "by how many", limited public preview,
+  host absorbs the gap on "share anyway". Recorded in CLAUDE.md (uneven splits now in scope) + PLAN.md.
+- Agent produced: `ScanningScreen` (dark, user's own photo with a sweeping scan line, steps driven by real progress:
+  uploaded → found N items → adds up / doesn't → "Review N items"; reduced-motion respected; per-line outlines
+  omitted since the AI returns no positions). AI marks uncertain lines (`flagged`, `flagNote`); flagged rows are
+  highlighted with the note; editing the price clears it. Mismatch banner ("$X is missing" / "too much", green
+  "Adds up now" after a fix), "Items add up to vs receipt subtotal", "Fix the $X first", "Share anyway, I'll cover
+  the $X" (only when lines are short) → `hostAdjustment` line charged to the host alone (computeShares + reconcile
+  + tests). 77/77 unit, 8/8 runtime.
+- Verified / changed: 

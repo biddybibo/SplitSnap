@@ -7,7 +7,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AuthOverlay, useAsyncResource, useAuth, useQuery, useR2Files } from 'deepspace'
-import { Camera, RotateCcw } from 'lucide-react'
+import { Camera } from 'lucide-react'
+import { ScanningScreen, type ScanStage } from '@/components/scan/ScanningScreen'
 import { Button } from '@/components/ui'
 import { callAction } from '@/lib/actions'
 import { resizeToJpegBase64 } from '@/lib/image'
@@ -25,6 +26,8 @@ interface Bill {
 
 interface ParseResult {
   billId: string
+  itemCount: number
+  check: { offByCents: number }
 }
 
 export default function HomePage() {
@@ -87,6 +90,7 @@ function ScanReceipt() {
   const libraryInput = useRef<HTMLInputElement>(null)
   const [photo, setPhoto] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [stage, setStage] = useState<ScanStage>('uploading')
 
   const scans = useAsyncResource(
     (signal) => callAction<{ remaining: number; limit: number }>('scansLeft', {}, signal),
@@ -103,14 +107,21 @@ function ScanReceipt() {
   // Each attempt costs one of the day's parses, so never retry automatically.
   const parse = useAsyncResource<ParseResult>(
     async (signal) => {
+      setStage('uploading')
       const imageBase64 = await resizeToJpegBase64(photo!)
       // The photo is a convenience for the review screen; a failed upload shouldn't block the bill.
       const uploaded = await uploadBase64(imageBase64, `receipts/${crypto.randomUUID()}.jpg`, 'image/jpeg')
-      return callAction<ParseResult>(
+      setStage('reading')
+      const result = await callAction<ParseResult>(
         'parseReceipt',
         { imageBase64, mimeType: 'image/jpeg', imageId: uploaded.success ? uploaded.key : undefined },
         signal,
       )
+      setStage('checking')
+      // A beat on "checking" so the result registers before the button appears.
+      await new Promise((r) => setTimeout(r, 700))
+      setStage('ready')
+      return result
     },
     [photo],
     { enabled: photo !== null, retry: 0, slowAfterMs: 8000 },
@@ -118,9 +129,8 @@ function ScanReceipt() {
 
   const { reload: reloadScans } = scans
   useEffect(() => {
-    if (parse.status === 'ready' && parse.data) navigate(`/b/${parse.data.billId}`)
-    if (parse.status === 'error') reloadScans()
-  }, [parse.status, parse.data, navigate, reloadScans])
+    if (parse.status === 'error' || parse.status === 'ready') reloadScans()
+  }, [parse.status, reloadScans])
 
   function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -128,7 +138,6 @@ function ScanReceipt() {
     if (file) setPhoto(file)
   }
 
-  const busy = parse.status === 'loading' || parse.status === 'ready'
   const outOfScans = scans.data?.remaining === 0
 
   return (
@@ -137,81 +146,41 @@ function ScanReceipt() {
       <input ref={cameraInput} type="file" accept="image/*" capture="environment" hidden onChange={onPick} />
       <input ref={libraryInput} type="file" accept="image/*" hidden onChange={onPick} />
 
-      {photo && previewUrl ? (
-        <div className="flex w-full flex-col gap-4">
-          <div className="flex gap-4">
-            <img
-              src={previewUrl}
-              alt="Your receipt"
-              className="h-[68px] w-[52px] shrink-0 rounded-md border border-border object-cover"
-            />
-            <div className="flex min-w-0 flex-col justify-center gap-1" aria-live="polite">
-              {busy && (
-                <>
-                  <p className="flex items-center gap-2 font-semibold">
-                    <span
-                      className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
-                      aria-hidden
-                    />
-                    Reading the receipt…
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {parse.isSlow ? 'Long receipts take a few seconds more.' : 'This usually takes about 5 seconds.'}
-                  </p>
-                </>
-              )}
-              {parse.status === 'error' && (
-                <>
-                  <p className="font-semibold text-destructive">Couldn&apos;t read that receipt</p>
-                  <p className="text-sm text-muted-foreground">{parse.error}</p>
-                </>
-              )}
-            </div>
-          </div>
-          {parse.status === 'error' && (
-            <div className="flex gap-2">
-              <Button className="h-11 flex-1" disabled={outOfScans} onClick={parse.reload}>
-                <RotateCcw /> Try again
-              </Button>
-              <Button
-                variant="outline"
-                className="h-11 flex-1"
-                disabled={outOfScans}
-                onClick={() => libraryInput.current?.click()}
-              >
-                Different photo
-              </Button>
-            </div>
-          )}
-        </div>
-      ) : (
-        <>
-          <CameraBadge />
-          <div className="flex flex-col items-center gap-1 text-center">
-            <h2 className="font-display text-[19px] font-semibold">Snap the receipt</h2>
-            <p className="text-sm text-muted-foreground">We read the items. You fix anything we miss.</p>
-          </div>
-          <div className="flex w-full flex-col gap-2.5">
-            <Button
-              size="lg"
-              className="h-[50px] text-base"
-              disabled={outOfScans}
-              onClick={() => cameraInput.current?.click()}
-            >
-              Take photo
-            </Button>
-            <Button
-              variant="outline"
-              size="lg"
-              className="h-[50px] bg-card text-base"
-              disabled={outOfScans}
-              onClick={() => libraryInput.current?.click()}
-            >
-              Upload an image
-            </Button>
-          </div>
-        </>
+      {photo && previewUrl && (
+        <ScanningScreen
+          photoUrl={previewUrl}
+          stage={parse.status === 'error' ? 'error' : stage}
+          itemCount={parse.data?.itemCount ?? null}
+          addsUp={parse.data ? parse.data.check.offByCents === 0 : null}
+          slow={parse.isSlow}
+          error={parse.error}
+          // Closing stops waiting; if the AI already answered, the bill still appears under Your bills.
+          onCancel={() => setPhoto(null)}
+          onReview={() => parse.data && navigate(`/b/${parse.data.billId}`)}
+          onRetry={parse.reload}
+          onDifferentPhoto={() => libraryInput.current?.click()}
+        />
       )}
+
+      <CameraBadge />
+      <div className="flex flex-col items-center gap-1 text-center">
+        <h2 className="font-display text-[19px] font-semibold">Snap the receipt</h2>
+        <p className="text-sm text-muted-foreground">We read the items. You fix anything we miss.</p>
+      </div>
+      <div className="flex w-full flex-col gap-2.5">
+        <Button size="lg" className="h-[50px] text-base" disabled={outOfScans} onClick={() => cameraInput.current?.click()}>
+          Take photo
+        </Button>
+        <Button
+          variant="outline"
+          size="lg"
+          className="h-[50px] bg-card text-base"
+          disabled={outOfScans}
+          onClick={() => libraryInput.current?.click()}
+        >
+          Upload an image
+        </Button>
+      </div>
       {scans.data && (
         <p className={cn('text-[13px]', outOfScans ? 'text-warning' : 'text-muted-foreground')}>
           {outOfScans

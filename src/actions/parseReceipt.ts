@@ -33,6 +33,8 @@ const receiptSchema = z.object({
       name: z.string(),
       qty: z.number().int(),
       priceCents: z.number().int().describe('Line total in cents as printed (qty already applied); negative for discounts'),
+      uncertain: z.boolean().describe('True if this line is hard to read (smudged, faded, cut off, ambiguous digits)'),
+      uncertainNote: z.string().nullable().describe('When uncertain: a short reason, e.g. "Smudged on the photo"'),
     }),
   ),
   subtotalCents: z.number().int().nullable().describe('Printed subtotal, or null if the receipt prints none'),
@@ -56,6 +58,7 @@ const PROMPT =
   'Use 0 for tax or tip if not printed. totalCents is the final total printed on the receipt. ' +
   'receiptNumber is the check, order or ticket number (not a table number, phone number or card digits). ' +
   'Never return card numbers or approval codes anywhere. ' +
+  'Mark a line uncertain only when its name or price is genuinely hard to read, with a short reason. ' +
   'Copy the numbers as printed even if they do not add up; never correct them.'
 
 /**
@@ -63,7 +66,9 @@ const PROMPT =
  * screen can point at the lines or at the total/tax, not just "something's off".
  */
 export function checkReceipt(
-  r: Pick<ParsedReceipt, 'items' | 'subtotalCents' | 'fees' | 'taxCents' | 'tipCents' | 'totalCents'>,
+  r: Pick<ParsedReceipt, 'subtotalCents' | 'fees' | 'taxCents' | 'tipCents' | 'totalCents'> & {
+    items: { priceCents: number }[]
+  },
 ) {
   const linesCents = r.items.reduce((sum, i) => sum + i.priceCents, 0)
   const feesCents = r.fees.reduce((sum, f) => sum + f.cents, 0)
@@ -174,6 +179,8 @@ export const parseReceipt: ActionHandler<Env> = async ({ userId, params, tools, 
       qty: i.qty,
       priceCents: i.priceCents,
       kind: i.priceCents < 0 ? 'discount' : 'item',
+      flagged: i.uncertain ? 1 : 0,
+      flagNote: i.uncertain ? (i.uncertainNote ?? 'Hard to read on the photo').slice(0, 120) : '',
     })),
     ...parsed.fees.map((f) => ({ name: f.name, qty: 1, priceCents: f.cents, kind: 'fee' })),
     { name: 'Tax', qty: 1, priceCents: parsed.taxCents, kind: 'tax' },
@@ -199,5 +206,5 @@ export const parseReceipt: ActionHandler<Env> = async ({ userId, params, tools, 
   )
   if (!bill.success) return { success: false, error: 'Could not save the bill; try again' }
 
-  return { success: true, data: { billId, check: checkReceipt(parsed) } }
+  return { success: true, data: { billId, itemCount: parsed.items.length, check: checkReceipt(parsed) } }
 }

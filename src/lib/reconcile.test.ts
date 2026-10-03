@@ -50,6 +50,14 @@ describe('reconcile', () => {
   })
 })
 
+describe('host adjustment', () => {
+  it('closes the gap like an adjustment', () => {
+    const lines: Line[] = [{ kind: 'item', priceCents: 390 }, { kind: 'hostAdjustment', priceCents: 210 }]
+    const r = reconcile(lines, { printedSubtotalCents: 600, printedTotalCents: 600, printedTipCents: 0, chargedCents: null })
+    expect(r).toMatchObject({ offByCents: 0, reconciled: true })
+  })
+})
+
 describe('tipForPercent', () => {
   it('uses the pre-tax food subtotal and rounds to the cent', () => {
     expect(tipForPercent(3400, 20)).toBe(680)

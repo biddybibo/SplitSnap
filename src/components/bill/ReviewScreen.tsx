@@ -8,7 +8,7 @@
  * new lines go through the host-only `addItem` action.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAsyncResource, useAuth, useDisplayName, useMutations, useQuery, useR2Files } from 'deepspace'
 import { AlertTriangle, Check, ChevronDown, ChevronLeft, Plus, Trash2 } from 'lucide-react'
@@ -38,6 +38,8 @@ export function ReviewScreen({ billId }: { billId: string }) {
   const [adding, setAdding] = useState(false)
   const [sharing, setSharing] = useState(false)
   const [photoOpen, setPhotoOpen] = useState(false)
+  // Remembers a mismatch seen during this visit, so fixing it turns the banner green instead of hiding it.
+  const sawMismatch = useRef(false)
 
   if (receiptQuery.status === 'loading' || itemsQuery.status === 'loading') {
     return <p className="px-5 py-10 text-center text-muted-foreground">Loading the bill…</p>
@@ -116,6 +118,15 @@ export function ReviewScreen({ billId }: { billId: string }) {
     : !hasPayHandle
       ? 'Add a way for friends to pay you.'
       : 'Friends join with the link and sign in to pick their items.'
+  // Only when the lines come up short: the host absorbing an *excess* would mean collecting more than they paid.
+  const canShareAnyway = canEdit && check.offByCents > 0 && check.chargedMismatchCents === null && !sharing && !adding
+  const flaggedCount = claimable.filter((i) => i.data.flagged).length
+  if (check.offByCents !== 0) sawMismatch.current = true
+
+  async function shareAnyway() {
+    await addLine('hostAdjustment', 'Host covers the difference', check.offByCents)
+    if (hasPayHandle) await share()
+  }
 
   async function share() {
     setSharing(true)
@@ -183,6 +194,16 @@ export function ReviewScreen({ billId }: { billId: string }) {
 
 
 
+      {isHost && (check.offByCents !== 0 || flaggedCount > 0 || sawMismatch.current) && (
+        <MismatchBanner
+          offByCents={check.offByCents}
+          suspect={check.suspect}
+          linesCents={check.claimableCents}
+          printedSubtotalCents={receipt.printedSubtotalCents ?? null}
+          flaggedCount={flaggedCount}
+        />
+      )}
+
       {/* Items */}
       <section className={cn(card, 'flex flex-col px-3.5 py-1')}>
         <ul className="flex flex-col">
@@ -192,7 +213,10 @@ export function ReviewScreen({ billId }: { billId: string }) {
               item={i.data}
               canEdit={canEdit}
               onName={(name) => updateItem(i.recordId, { name })}
-              onPrice={(priceCents) => updateItem(i.recordId, { priceCents, kind: priceCents < 0 ? 'discount' : 'item' })}
+              // Editing the price is the host checking it, so it clears the AI's flag.
+              onPrice={(priceCents) =>
+                updateItem(i.recordId, { priceCents, kind: priceCents < 0 ? 'discount' : 'item', flagged: 0 })
+              }
               onDelete={() => removeItem(i.recordId)}
             />
           ))}
@@ -202,6 +226,21 @@ export function ReviewScreen({ billId }: { billId: string }) {
           <AddLineForm busy={adding} onAdd={(name, cents) => addLine(cents < 0 ? 'discount' : 'item', name, cents)} />
         )}
       </section>
+
+      {isHost && receipt.printedSubtotalCents != null && check.offByCents !== 0 && (
+        <section className={cn(card, 'flex flex-col gap-2 px-3.5 py-3 text-sm')}>
+          <div className="flex justify-between text-muted-foreground">
+            <span>Items add up to</span>
+            <span className={cn('font-mono font-semibold tabular-nums', check.linesMatchSubtotal ? 'text-success' : 'text-warning')}>
+              {formatCents(check.claimableCents)}
+            </span>
+          </div>
+          <div className="flex justify-between text-muted-foreground">
+            <span>Receipt subtotal</span>
+            <span className="font-mono tabular-nums">{formatCents(receipt.printedSubtotalCents)}</span>
+          </div>
+        </section>
+      )}
 
       {/* Totals + tip */}
       <section className={cn(card, 'flex flex-col gap-2.5 px-3.5 py-3')}>
@@ -311,11 +350,21 @@ export function ReviewScreen({ billId }: { billId: string }) {
       {isHost && (
         <div className="flex flex-col gap-2 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-3">
           <Button size="lg" className="h-[52px] text-base" disabled={!canShare} onClick={share}>
-            {sharing ? 'Opening…' : 'Share with the table'}
+            {sharing
+              ? 'Opening…'
+              : check.offByCents !== 0
+                ? `Fix the ${formatCents(Math.abs(check.offByCents))} first`
+                : 'Share with the table'}
           </Button>
-          <p className={cn('text-center text-[12.5px]', canShare ? 'text-muted-foreground' : 'text-warning')}>
-            {shareHint}
-          </p>
+          {canShareAnyway ? (
+            <button type="button" onClick={shareAnyway} className="h-11 text-sm font-semibold text-muted-foreground hover:text-foreground">
+              Share anyway, I&apos;ll cover the {formatCents(check.offByCents)}
+            </button>
+          ) : (
+            <p className={cn('text-center text-[12.5px]', canShare ? 'text-muted-foreground' : 'text-warning')}>
+              {shareHint}
+            </p>
+          )}
         </div>
       )}
     </div>
@@ -416,13 +465,21 @@ function LineRow({
   onPrice: (cents: number) => void
   onDelete?: () => void
 }) {
+  const flagged = Boolean(item.flagged) && canEdit
   return (
-    <li className="flex items-center gap-1.5 border-b border-muted py-2 last:border-b-0">
+    <li className="flex flex-col gap-1 border-b border-muted py-2 last:border-b-0">
+      <div className="flex items-center gap-1.5">
       {item.qty > 1 && <span className="text-sm text-muted-foreground tabular-nums">{item.qty}×</span>}
       {canEdit ? (
         <>
           <TextField label="Item name" value={item.name} onSave={onName} className="-ml-2" />
-          <MoneyField boxed label={`Price of ${item.name}`} cents={item.priceCents} onSave={(c) => c !== null && onPrice(c)} />
+          <MoneyField
+            boxed
+            label={`Price of ${item.name}`}
+            cents={item.priceCents}
+            onSave={(c) => c !== null && onPrice(c)}
+            className={cn(flagged && 'border-2 border-[#C7690F] bg-warning-soft')}
+          />
           {onDelete ? (
             <button
               type="button"
@@ -441,6 +498,12 @@ function LineRow({
           <span className="min-w-0 flex-1 truncate py-1.5">{item.name}</span>
           <span className="font-mono text-sm tabular-nums">{formatCents(item.priceCents)}</span>
         </>
+      )}
+      </div>
+      {flagged && (
+        <p className="text-[12.5px] text-warning">
+          {item.flagNote || 'Hard to read on the photo'}. We read {formatCents(item.priceCents)}; check the receipt.
+        </p>
       )}
     </li>
   )
@@ -655,6 +718,58 @@ function DetailRow({ label, hint, children }: { label: string; hint?: string; ch
         {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
       </span>
       {children}
+    </div>
+  )
+}
+
+/** "Doesn't add up" banner (design: Mismatch.dc.html). Turns green once the lines match. */
+function MismatchBanner({
+  offByCents,
+  suspect,
+  linesCents,
+  printedSubtotalCents,
+  flaggedCount,
+}: {
+  offByCents: number
+  suspect: 'lines' | 'total' | null
+  linesCents: number
+  printedSubtotalCents: number | null
+  flaggedCount: number
+}) {
+  const ok = offByCents === 0
+  const title = ok
+    ? 'Adds up now'
+    : `${formatCents(Math.abs(offByCents))} ${offByCents > 0 ? 'is missing' : 'too much'}`
+  const body = ok
+    ? flaggedCount > 0
+      ? `${flaggedCount} ${flaggedCount === 1 ? 'line was' : 'lines were'} hard to read. Give ${flaggedCount === 1 ? 'it' : 'them'} a quick look against the photo.`
+      : 'Items match the receipt. You can share it.'
+    : suspect === 'total'
+      ? "The receipt's own numbers don't add up, so the total or tax was probably misread. Check them under \"Check against the receipt\"."
+      : printedSubtotalCents !== null
+        ? `Items add up to ${formatCents(linesCents)} but the receipt says ${formatCents(printedSubtotalCents)}. Check the highlighted line or add a missed item.`
+        : 'Check the highlighted lines against the photo, or add a missed item.'
+  return (
+    <div
+      role="status"
+      className={cn(
+        'flex items-start gap-2.5 rounded-xl border px-3.5 py-3',
+        ok ? 'border-[#B7DCC8] bg-success-soft' : 'border-[#F2C9A3] bg-warning-soft',
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          'flex size-[22px] shrink-0 items-center justify-center rounded-full text-[13px] font-bold text-white',
+          ok ? 'bg-success' : 'bg-[#C7690F]',
+        )}
+      >
+        {ok ? '✓' : '!'}
+      </span>
+      <span className="flex flex-col gap-0.5">
+        <span className={cn('text-[14.5px] font-semibold', ok ? 'text-success' : 'text-warning')}>{title}</span>
+        <span className="text-[13px] leading-snug text-[#3D414A]">{body}</span>
+      </span>
     </div>
   )
 }
