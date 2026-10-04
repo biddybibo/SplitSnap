@@ -25,6 +25,52 @@
       in src/styles.css (slate) / src/themes.css; keep them in sync when
       adding or editing themes.
     -->
+    <!--
+      Blank-page safety net. A deploy replaces the hashed /assets/* files, so a tab
+      (or a restored page) still pointing at the old ones loads nothing and stays
+      blank. This runs before the app's own code: if an app file fails to load, or
+      nothing has rendered after 10 s, reload once. The sessionStorage marker makes
+      it at most one reload, so a real outage can't loop; it clears after a good render.
+    -->
+    <script>
+      (function () {
+        var KEY = 'splitsnap:boot-reload'
+        function reloadOnce() {
+          try {
+            if (sessionStorage.getItem(KEY)) return
+            sessionStorage.setItem(KEY, '1')
+          } catch (e) {
+            return // no storage: can't guard against a loop, so don't reload at all
+          }
+          location.reload()
+        }
+        function rendered() {
+          var root = document.getElementById('root')
+          return !!(root && root.firstElementChild)
+        }
+        window.addEventListener(
+          'error',
+          function (e) {
+            var t = e.target
+            var url = t && (t.src || t.href)
+            if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK') && /\/assets\//.test(url || '')) reloadOnce()
+          },
+          true,
+        )
+        setTimeout(function () {
+          if (!rendered()) reloadOnce()
+        }, 10000)
+        window.addEventListener('load', function () {
+          setTimeout(function () {
+            if (rendered()) {
+              try {
+                sessionStorage.removeItem(KEY)
+              } catch (e) {}
+            }
+          }, 3000)
+        })
+      })()
+    </script>
     <style>
       html { background-color: #0a0a0a; color-scheme: dark; }
       html[data-theme="paper"] { background-color: #ffffff; color-scheme: light; }

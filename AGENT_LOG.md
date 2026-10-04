@@ -185,3 +185,13 @@ One entry per session: what I asked for, what the agent produced, what I verifie
 - Host view tweak (my call): moved "Nobody claimed" under the host's own items, then removed it as redundant —
   each card already says "Nobody yet". Host assigns from the item's split sheet (same host-only assignItem);
   the progress card now says so.
+
+## 2026-10-04 — Safety net, Settle fixes, break-it script
+- Asked: OK'd the reload-once safety net and Settle fixes; asked for break-it console scripts.
+- Agent produced: inline script in index.html (reload once if an /assets/ file fails to load or nothing renders
+  in 10 s; sessionStorage marker = at most one reload; cleared after a good render). Settle: host sees
+  "How friends pay you" with a preview of the friends' pay buttons and can add/edit handles after lock (amounts
+  unchanged). `tests/break-it.md`: one paste-in console script that opens raw room sockets / calls actions as an
+  attacker would and prints PASS/FAIL for 10 friend checks, 4 host checks, the usage table, and the public
+  preview; table of what each proves. Script syntax-checked only (needs a signed-in browser to run).
+- Verified / changed: 

@@ -4,6 +4,7 @@
  * not a client recomputation. "I paid" is each person's own participants row.
  */
 
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth, useMutations, useQuery } from 'deepspace'
 import { ChevronLeft } from 'lucide-react'
@@ -11,6 +12,7 @@ import { useToast } from '@/components/ui'
 import { formatCents } from '@/lib/money'
 import { payLinks } from '@/lib/payLinks'
 import { cn } from '@/lib/utils'
+import { HandleField } from './fields'
 import { Avatar, type Participant } from './Table'
 import type { ReceiptRow, ShareRow } from './types'
 
@@ -20,7 +22,10 @@ export function SettleScreen() {
   const sharesQuery = useQuery<ShareRow>('shares')
   const participantsQuery = useQuery<Participant>('participants', { orderBy: 'createdAt', orderDir: 'asc' })
   const participantMutations = useMutations<Participant>('participants')
+  const receiptMutations = useMutations<ReceiptRow>('receipt')
+  const receiptId = useQuery<ReceiptRow>('receipt').records[0]?.recordId
   const toast = useToast()
+  const [editingHandles, setEditingHandles] = useState(false)
 
   if (!receipt || sharesQuery.status === 'loading' || participantsQuery.status === 'loading') {
     return <p className="px-5 py-10 text-center text-muted-foreground">Loading the totals…</p>
@@ -37,6 +42,16 @@ export function SettleScreen() {
   const billTotal = shares.reduce((s, x) => s + x.totalCents, 0)
   const links = payLinks(receipt, owed, `${receipt.merchant} (SplitSnap)`)
   const unpaid = people.filter((p) => p.data.userId !== receipt.hostId && !p.data.paid && (shareOf(p.data.userId)?.totalCents ?? 0) > 0)
+
+  // What friends see, for the host to check: the same links, built for an example amount.
+  const previewLinks = payLinks(receipt, 100, '')
+  const hasHandle = previewLinks.length > 0
+
+  function saveHandle(patch: Partial<ReceiptRow>) {
+    if (!receiptId || !receiptMutations.ready) return
+    // Pay handles stay host-editable after lock (writableFields); amounts don't change.
+    receiptMutations.put(receiptId, patch).catch(() => toast.error("Couldn't save that handle"))
+  }
 
   function togglePaid() {
     if (!me || !participantMutations.ready) return
@@ -123,6 +138,53 @@ export function SettleScreen() {
         )}
         {!isHost && owed === 0 && <p className="text-sm text-muted-foreground">You don&apos;t owe anything on this bill.</p>}
       </section>
+
+      {isHost && (
+        <section className="flex flex-col gap-3 rounded-xl border border-border bg-card px-3.5 py-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="font-semibold">How friends pay you</h2>
+              <p className="text-[13px] text-muted-foreground">
+                {hasHandle ? 'Friends see these buttons with their amount filled in.' : 'Add one so friends get a pay button.'}
+              </p>
+            </div>
+            {hasHandle && (
+              <button
+                type="button"
+                onClick={() => setEditingHandles((e) => !e)}
+                className="h-9 shrink-0 rounded-full border border-input px-3 text-[13px] font-semibold hover:bg-accent"
+              >
+                {editingHandles ? 'Done' : 'Edit'}
+              </button>
+            )}
+          </div>
+          {hasHandle && !editingHandles && (
+            <div
+              aria-label="Preview of friends' pay buttons"
+              className={cn('grid gap-2', previewLinks.length === 3 ? 'grid-cols-3' : previewLinks.length === 2 ? 'grid-cols-2' : 'grid-cols-1')}
+            >
+              {previewLinks.map((l, i) => (
+                <span
+                  key={l.app}
+                  className={cn(
+                    'flex h-[46px] items-center justify-center rounded-[10px] text-sm font-semibold opacity-70',
+                    i === 0 ? 'bg-primary text-primary-foreground' : 'border border-input bg-card',
+                  )}
+                >
+                  {l.app}
+                </span>
+              ))}
+            </div>
+          )}
+          {(!hasHandle || editingHandles) && (
+            <div className="flex flex-col gap-3">
+              <HandleField label="Venmo" prefix="@" placeholder="your-venmo" value={receipt.payVenmo ?? ''} onSave={(payVenmo) => saveHandle({ payVenmo })} />
+              <HandleField label="Cash App" prefix="$" placeholder="cashtag" value={receipt.payCashApp ?? ''} onSave={(payCashApp) => saveHandle({ payCashApp })} />
+              <HandleField label="PayPal" prefix="paypal.me/" placeholder="name" value={receipt.payPaypal ?? ''} onSave={(payPaypal) => saveHandle({ payPaypal })} />
+            </div>
+          )}
+        </section>
+      )}
 
       <section className="flex flex-col gap-2.5">
         <h2 className="text-[13px] font-semibold uppercase tracking-[0.6px] text-muted-foreground">The table</h2>
