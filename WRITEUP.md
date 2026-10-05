@@ -94,9 +94,9 @@ own invite sheet instead of the phone's share sheet; dropping the bank check and
 - Blank pages that I reproduced on my own laptop, which pinned them on tabs left open across deploys and led to a
   reload-once safety net.
 - The Preview button hiding behind Safari's toolbar, and the host's settle page missing pay buttons.
-- I checked `computeShares` by hand on a real receipt
+- I checked `computeShares` by hand on a real receipt.
 
-Working with an agent primarily served as a way to refactor code faster, assess best optimizing architecture for the code, and automated testing. If this were to be done again I would spend more time testing myself rather than automated tests.
+Working with an agent primarily served as a way to refactor code faster, assess the best architecture for the code, and automated testing. If this were to be done again I would spend more time testing myself rather than automated tests.
 
 ## Proving it's safe
 
@@ -149,6 +149,9 @@ Each bill already has its own room, so tables scale out independently. What woul
 
 - "I paid" is self-reported; the app can't see Venmo / Cash App / PayPal transactions. Two-way confirmation
   by the host is the first item under "What I'd do next".
+- "By how many" follows the quantity printed on the receipt, so one order that holds several pieces (an order of
+  3 tacos) can only be split evenly. The host can work around it by splitting the line into two on the review
+  screen. Next: let the host set the number of pieces on a line.
 - Sign-in needs a Google or GitHub account; guests cover everyone else.
 - The newest screens (guests, "by how many" from a friend's side) were exercised more by automated runs than by
   people at a real table.
