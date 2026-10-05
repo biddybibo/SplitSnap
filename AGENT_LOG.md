@@ -195,3 +195,13 @@ One entry per session: what I asked for, what the agent produced, what I verifie
   attacker would and prints PASS/FAIL for 10 friend checks, 4 host checks, the usage table, and the public
   preview; table of what each proves. Script syntax-checked only (needs a signed-in browser to run).
 - Verified / changed: 
+
+## 2026-10-04 — Break-it tests run by the agent (I'd done the two-phone test myself)
+- Asked: run the break-it tests for me.
+- Agent produced: two @deepspace.test accounts (Hana host, Felix friend; random passwords piped to the CLI, kept
+  in ~/.deepspace only) and `tests/break-it.run.mjs`: generates a receipt, Hana scans/handles/shares on the live
+  site, Felix joins and claims, then the tests/break-it.md script runs as each. 18/18 PASS (table in
+  tests/break-it.md). Found and fixed a real bug on the way: the host's first Share didn't open the invite sheet
+  (the live "seated" update switched to the claim screen before `?invite=1` was added); claim screen now reacts to
+  the param. Also fixed a bug in my own check 2.
+- Verified / changed: 
