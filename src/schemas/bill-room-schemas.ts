@@ -159,6 +159,8 @@ export const guestClaimsSchema: CollectionSchema = {
   columns: [
     { name: 'itemId', storage: 'text', interpretation: 'plain', required: true },
     { name: 'guestId', storage: 'text', interpretation: 'plain', required: true },
+    // "By how many" count, as on claims.
+    { name: 'units', storage: 'number', interpretation: 'plain' },
   ],
   uniqueOn: ['itemId', 'guestId'],
   permissions: { '*': NO_ACCESS, viewer: READ_ONLY, member: READ_ONLY, admin: READ_ONLY },

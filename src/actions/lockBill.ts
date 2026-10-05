@@ -17,7 +17,7 @@ import type { Env } from '../../worker'
 type BillRow = { hostId: string; status: string }
 type ItemRow = { kind: LineKind; priceCents: number; qty?: number; name?: string }
 type ClaimRow = { itemId: string; userId: string; units?: number | null }
-type GuestClaimRow = { itemId: string; guestId: string }
+type GuestClaimRow = { itemId: string; guestId: string; units?: number | null }
 type ReceiptRow = {
   printedSubtotalCents: number | null
   printedTotalCents: number
@@ -57,7 +57,7 @@ export const lockBill: ActionHandler<Env> = async ({ userId, params, tools, env,
   }))
   const allClaims: ShareClaim[] = [
     ...claims.data.records.map((r) => ({ itemId: r.data.itemId, userId: r.data.userId, units: r.data.units ?? null })),
-    ...guestClaims.data.records.map((r) => ({ itemId: r.data.itemId, userId: `guest:${r.data.guestId}` })),
+    ...guestClaims.data.records.map((r) => ({ itemId: r.data.itemId, userId: `guest:${r.data.guestId}`, units: r.data.units ?? null })),
   ]
 
   const claimedIds = new Set(allClaims.map((c) => c.itemId))

@@ -14,7 +14,7 @@ import { useAuth, useMutations, usePresenceRoom, useQuery } from 'deepspace'
 import { Pencil, SplitSquareHorizontal } from 'lucide-react'
 import { Button, ConfirmModal, buttonVariants, useToast } from '@/components/ui'
 import { callAction } from '@/lib/actions'
-import { claimsByLine, unclaimedCount, type ClaimRow } from '@/lib/claims'
+import { claimsByLine, unclaimedCount } from '@/lib/claims'
 import { computeShares } from '@/lib/computeShares'
 import { formatCents } from '@/lib/money'
 import { reconcile } from '@/lib/reconcile'
@@ -22,15 +22,15 @@ import { cn } from '@/lib/utils'
 import { HostPanel } from './HostPanel'
 import { InviteSheet } from './InviteSheet'
 import { SplitSheet } from './SplitSheet'
-import { Avatar, AvatarStack, JoinCard, type Participant } from './Table'
+import { Avatar, AvatarStack, JoinCard } from './Table'
+import { useTable } from './useTable'
 import type { Item, ReceiptRow } from './types'
 
 export function ClaimScreen({ billId }: { billId: string }) {
   const { userId } = useAuth()
   const receiptQuery = useQuery<ReceiptRow>('receipt')
   const itemsQuery = useQuery<Item>('items', { orderBy: 'createdAt', orderDir: 'asc' })
-  const claimsQuery = useQuery<ClaimRow>('claims')
-  const participantsQuery = useQuery<Participant>('participants', { orderBy: 'createdAt', orderDir: 'asc' })
+  const table = useTable()
   const claimMutations = useMutations<{ itemId: string; units?: number | null }>('claims')
   const { peers } = usePresenceRoom(`bill:${billId}`)
   const toast = useToast()
@@ -53,11 +53,11 @@ export function ClaimScreen({ billId }: { billId: string }) {
   }, [params, setParams])
 
   const receipt = receiptQuery.records[0]?.data
-  if (!receipt || itemsQuery.status === 'loading' || claimsQuery.status === 'loading') {
+  if (!receipt || itemsQuery.status === 'loading' || table.loading) {
     return <p className="px-5 py-10 text-center text-muted-foreground">Loading the bill…</p>
   }
 
-  const people = participantsQuery.records.map((p) => p.data)
+  const people = table.people
   const nameOf = (id: string) => people.find((p) => p.userId === id)?.displayName ?? 'Someone'
   const me = people.find((p) => p.userId === userId)
   const isHost = receipt.hostId === userId
@@ -67,7 +67,7 @@ export function ClaimScreen({ billId }: { billId: string }) {
   const lines = itemsQuery.records
     .filter((i) => i.data.kind === 'item' || i.data.kind === 'discount')
     .map((i) => ({ id: i.recordId, priceCents: i.data.priceCents, name: i.data.name, qty: Math.max(1, i.data.qty ?? 1) }))
-  const claims = claimsQuery.records
+  const claims = table.claims
   const byLine = claimsByLine(lines, claims.map((c) => c.data))
   const shares = computeShares(
     itemsQuery.records.map((i) => ({ id: i.recordId, kind: i.data.kind, priceCents: i.data.priceCents })),
@@ -214,7 +214,7 @@ export function ClaimScreen({ billId }: { billId: string }) {
       )}
       {isHost && <h2 className="px-5 pb-2 text-[13px] font-semibold uppercase tracking-[0.6px] text-muted-foreground">What you had</h2>}
 
-      {!me && participantsQuery.status === 'ready' && (
+      {!me && table.participantsReady && (
         <div className="px-5 pb-3">
           <JoinCard billId={billId} hostName={hostName} />
         </div>
@@ -348,6 +348,7 @@ export function ClaimScreen({ billId }: { billId: string }) {
           hostId={receipt.hostId}
           people={people}
           hereIds={hereIds}
+          isHost={isHost}
           onClose={closeInvite}
         />
       )}

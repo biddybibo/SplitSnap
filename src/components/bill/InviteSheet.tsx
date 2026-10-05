@@ -5,7 +5,9 @@
 
 import { useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
-import { Mail, MessageCircle, MessageSquare, MoreHorizontal, X } from 'lucide-react'
+import { Mail, MessageCircle, MessageSquare, MoreHorizontal, UserPlus, X } from 'lucide-react'
+import { Button, useToast } from '@/components/ui'
+import { callAction } from '@/lib/actions'
 import { formatCents } from '@/lib/money'
 import { cn } from '@/lib/utils'
 import { Avatar, type Participant } from './Table'
@@ -18,6 +20,8 @@ interface InviteSheetProps {
   hostId: string
   people: Participant[]
   hereIds: Set<string>
+  /** Only the host can add or remove guests. */
+  isHost: boolean
   onClose: () => void
 }
 
@@ -25,7 +29,37 @@ const MARK_LEFT = 'M28 16H57V94L53.375 100L49.75 94L46.125 100L42.5 94L38.875 10
 const MARK_RIGHT = 'M63 24H92V102L88.375 108L84.75 102L81.125 108L77.5 102L73.875 108L70.25 102L66.625 108L63 102Z'
 
 export function InviteSheet(props: InviteSheetProps) {
-  const { billId, merchant, totalCents, hostName, hostId, people, hereIds, onClose } = props
+  const { billId, merchant, totalCents, hostName, hostId, people, hereIds, isHost, onClose } = props
+  const toast = useToast()
+  const [guestFormOpen, setGuestFormOpen] = useState(false)
+  const [guestName, setGuestName] = useState('')
+  const [guestBusy, setGuestBusy] = useState(false)
+
+  async function addGuest() {
+    const name = guestName.trim()
+    if (!name) return
+    setGuestBusy(true)
+    try {
+      await callAction('addGuest', { billId, displayName: name })
+      setGuestName('')
+      setGuestFormOpen(false)
+    } catch (err) {
+      toast.error("Couldn't add the guest", err instanceof Error ? err.message : undefined)
+    } finally {
+      setGuestBusy(false)
+    }
+  }
+
+  async function removeGuest(guestUserId: string) {
+    setGuestBusy(true)
+    try {
+      await callAction('removeGuest', { billId, guestId: guestUserId.slice('guest:'.length) })
+    } catch (err) {
+      toast.error("Couldn't remove the guest", err instanceof Error ? err.message : undefined)
+    } finally {
+      setGuestBusy(false)
+    }
+  }
   const url = `${window.location.origin}/b/${billId}`
   const shortUrl = url.replace(/^https?:\/\//, '')
   const [tab, setTab] = useState<'link' | 'qr'>('link')
@@ -186,15 +220,67 @@ export function InviteSheet(props: InviteSheetProps) {
 
         <div className="h-px bg-muted" />
 
+        {isHost && (
+          <div className="flex flex-col gap-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-sm font-semibold">No phone or won&apos;t sign in?</span>
+                <span className="text-[12.5px] text-muted-foreground">Add them by name and pick for them.</span>
+              </div>
+              {!guestFormOpen && (
+                <Button variant="outline" className="h-11 shrink-0" onClick={() => setGuestFormOpen(true)}>
+                  <UserPlus /> Add guest
+                </Button>
+              )}
+            </div>
+            {guestFormOpen && (
+              <form
+                className="flex gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  void addGuest()
+                }}
+              >
+                <input
+                  autoFocus
+                  aria-label="Guest's name"
+                  placeholder="Their name"
+                  maxLength={40}
+                  value={guestName}
+                  onChange={(e) => setGuestName(e.target.value)}
+                  className="min-w-0 flex-1 rounded-md border border-input bg-card px-3 py-2 text-base"
+                />
+                <Button type="submit" className="h-11" disabled={guestBusy || guestName.trim().length === 0}>
+                  Add
+                </Button>
+              </form>
+            )}
+            <p className="text-[12.5px] text-muted-foreground">
+              Pick their items with the split button next to each item.
+            </p>
+          </div>
+        )}
+
         <div className="flex flex-col gap-2">
           <h3 className="text-[13px] font-semibold uppercase tracking-[0.6px] text-muted-foreground">At the table</h3>
           <ul className="flex flex-wrap gap-3.5">
             {people.map((p) => {
-              const status = p.userId === hostId ? 'Host' : hereIds.has(p.userId) ? 'Here now' : 'Joined'
+              const status = p.userId === hostId ? 'Host' : p.isGuest ? 'Guest' : hereIds.has(p.userId) ? 'Here now' : 'Joined'
               return (
                 <li key={p.userId} className="flex w-14 flex-col items-center gap-1">
                   <Avatar id={p.userId} name={p.displayName} size={36} />
                   <span className="max-w-full truncate text-xs">{p.displayName}</span>
+                  {isHost && p.isGuest && (
+                    <button
+                      type="button"
+                      disabled={guestBusy}
+                      onClick={() => removeGuest(p.userId)}
+                      aria-label={`Remove guest ${p.displayName}`}
+                      className="text-[11px] text-muted-foreground underline disabled:opacity-50"
+                    >
+                      Remove
+                    </button>
+                  )}
                   <span
                     className={cn(
                       'text-[11.5px]',

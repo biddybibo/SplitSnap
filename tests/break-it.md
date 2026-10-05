@@ -113,6 +113,14 @@ check 2, and check 1 if the server stamps instead of refusing) are deleted again
     // 10. Add a line through the action.
     const r10 = await action('addItem', { billId, kind: 'discount', name: 'Free money', priceCents: -100000 })
     record('10. Call addItem', refused(r10), r10.error ?? 'accepted')
+    // 11–13. Guests are host-only too.
+    const r11 = await action('addGuest', { billId, displayName: 'Fake friend' })
+    record('11. Call addGuest', refused(r11), r11.error ?? 'accepted')
+    const r12 = await put(bill, 'guestClaims', id(), { itemId: item.recordId, guestId: 'made-up' })
+    record('12. Write a guest claim', refused(r12), r12.error ?? 'accepted')
+    const guest = (await read(bill, 'guests'))[0]
+    const r13 = await action('setGuestPaid', { billId, guestId: guest?.recordId ?? 'made-up', paid: true })
+    record('13. Mark a guest paid', refused(r13), r13.error ?? 'accepted')
   } else {
     // Even the host can't lock by hand or write the shares: only lockBill can.
     const h1 = await put(bill, 'receipt', 'receipt', { lockedAt: new Date().toISOString() })
@@ -159,6 +167,8 @@ check 2, and check 1 if the server stamps instead of refusing) are deleted again
 | 6 | Lock the bill by hand | Refused | `receipt` update is host-only |
 | 7 | Mark someone else paid | Refused | `participants` update `own` |
 | 8–10 | Call host-only actions | "Only the host…" | `lockBill`, `assignItem`, `addItem` check `bills.hostId` |
+| 11, 13 | Add a guest / mark a guest paid | "Only the host…" | `addGuest`, `setGuestPaid` check `bills.hostId` |
+| 12 | Write a guest claim directly | Refused | `guestClaims`: no member writes |
 | H1–H2 | Host locks or writes shares by hand | Refused | `lockedAt` not in host `writableFields`; `shares` no writes |
 | H3 | Host adds a line without `addItem` | Refused | `items` create `false` for everyone |
 | H4 | Host marks a friend paid | Refused | `participants` update `own` |

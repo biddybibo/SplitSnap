@@ -11,6 +11,8 @@ export interface Participant {
   userId: string
   displayName: string
   paid: number
+  /** Host-added guest (no account); userId is `guest:<guestId>`. */
+  isGuest?: boolean
 }
 
 export function Avatar({ id, name, size = 28, ring }: { id: string; name: string; size?: number; ring?: boolean }) {

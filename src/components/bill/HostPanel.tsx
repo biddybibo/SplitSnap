@@ -67,8 +67,11 @@ export function HostPanel({ meId, lines, byLine, people, hereIds, claimCounts }:
                   <span className="flex-1">
                     {p.displayName}
                     {p.userId === meId && <span className="text-muted-foreground"> (you)</span>}
+                    {p.isGuest && <span className="text-muted-foreground"> · guest</span>}
                   </span>
-                  {n > 0 ? (
+                  {p.isGuest && n === 0 ? (
+                    <span className="text-[12.5px] text-muted-foreground">Guest · pick for them</span>
+                  ) : n > 0 ? (
                     <span className="text-[12.5px] font-semibold text-success">Picked {n}</span>
                   ) : here ? (
                     <span className="flex items-center gap-1.5 text-[12.5px] font-semibold text-primary">

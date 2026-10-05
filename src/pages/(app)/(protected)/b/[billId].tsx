@@ -18,6 +18,8 @@ import type { Participant } from '@/components/bill/Table'
 import type { ReceiptRow } from '@/components/bill/types'
 import {
   claimsSchema,
+  guestClaimsSchema,
+  guestsSchema,
   itemsSchema,
   participantsSchema,
   receiptSchema,
@@ -28,7 +30,7 @@ export default function BillPage() {
   const { billId } = useParams()
   if (!billId) return null
   return (
-    <RecordScope roomId={`bill:${billId}`} schemas={[receiptSchema, itemsSchema, participantsSchema, claimsSchema, sharesSchema]} isolated>
+    <RecordScope roomId={`bill:${billId}`} schemas={[receiptSchema, itemsSchema, participantsSchema, claimsSchema, guestsSchema, guestClaimsSchema, sharesSchema]} isolated>
       <BillRouter billId={billId} />
     </RecordScope>
   )
@@ -51,7 +53,7 @@ function BillRouter({ billId }: { billId: string }) {
   const hostSeated = participantsQuery.records.some((p) => p.data.userId === receipt.hostId)
 
   // Locked: everyone settles up; nothing can be edited or claimed any more.
-  if (receipt.lockedAt) return <SettleScreen />
+  if (receipt.lockedAt) return <SettleScreen billId={billId} />
   if (params.get('view') === 'split') return <SplitPreview billId={billId} />
   if (isHost && (!hostSeated || params.get('edit') === '1')) return <ReviewScreen billId={billId} />
   return <ClaimScreen billId={billId} />

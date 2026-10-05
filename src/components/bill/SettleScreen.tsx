@@ -9,39 +9,42 @@ import { Link } from 'react-router-dom'
 import { useAuth, useMutations, useQuery } from 'deepspace'
 import { ChevronLeft } from 'lucide-react'
 import { useToast } from '@/components/ui'
+import { callAction } from '@/lib/actions'
 import { formatCents } from '@/lib/money'
 import { payLinks } from '@/lib/payLinks'
 import { cn } from '@/lib/utils'
 import { HandleField } from './fields'
 import { Avatar, type Participant } from './Table'
+import { useTable } from './useTable'
 import type { ReceiptRow, ShareRow } from './types'
 
-export function SettleScreen() {
+export function SettleScreen({ billId }: { billId: string }) {
   const { userId } = useAuth()
   const receipt = useQuery<ReceiptRow>('receipt').records[0]?.data
   const sharesQuery = useQuery<ShareRow>('shares')
-  const participantsQuery = useQuery<Participant>('participants', { orderBy: 'createdAt', orderDir: 'asc' })
+  const table = useTable()
   const participantMutations = useMutations<Participant>('participants')
   const receiptMutations = useMutations<ReceiptRow>('receipt')
   const receiptId = useQuery<ReceiptRow>('receipt').records[0]?.recordId
   const toast = useToast()
   const [editingHandles, setEditingHandles] = useState(false)
+  const [guestBusy, setGuestBusy] = useState<string | null>(null)
 
-  if (!receipt || sharesQuery.status === 'loading' || participantsQuery.status === 'loading') {
+  if (!receipt || sharesQuery.status === 'loading' || table.loading) {
     return <p className="px-5 py-10 text-center text-muted-foreground">Loading the totals…</p>
   }
 
   const shares = sharesQuery.records.map((r) => r.data)
-  const people = participantsQuery.records
+  const people = table.people
   const shareOf = (id: string) => shares.find((s) => s.userId === id)
   const isHost = receipt.hostId === userId
-  const hostName = people.find((p) => p.data.userId === receipt.hostId)?.data.displayName ?? 'the host'
-  const me = people.find((p) => p.data.userId === userId)
+  const hostName = people.find((p) => p.userId === receipt.hostId)?.displayName ?? 'the host'
+  const me = people.find((p) => p.userId === userId)
   const mine = userId ? shareOf(userId) : undefined
   const owed = mine?.totalCents ?? 0
   const billTotal = shares.reduce((s, x) => s + x.totalCents, 0)
   const links = payLinks(receipt, owed, `${receipt.merchant} (SplitSnap)`)
-  const unpaid = people.filter((p) => p.data.userId !== receipt.hostId && !p.data.paid && (shareOf(p.data.userId)?.totalCents ?? 0) > 0)
+  const unpaid = people.filter((p) => p.userId !== receipt.hostId && !p.paid && (shareOf(p.userId)?.totalCents ?? 0) > 0)
 
   // What friends see, for the host to check: the same links, built for an example amount.
   const previewLinks = payLinks(receipt, 100, '')
@@ -55,7 +58,19 @@ export function SettleScreen() {
 
   function togglePaid() {
     if (!me || !participantMutations.ready) return
-    participantMutations.put(me.recordId, { paid: me.data.paid ? 0 : 1 }).catch(() => toast.error("Couldn't save that"))
+    participantMutations.put(me.recordId, { paid: me.paid ? 0 : 1 }).catch(() => toast.error("Couldn't save that"))
+  }
+
+  /** Guests can't tap "I paid", so the host records it (host-only action). */
+  async function toggleGuestPaid(guestRecordId: string, paid: boolean) {
+    setGuestBusy(guestRecordId)
+    try {
+      await callAction('setGuestPaid', { billId, guestId: guestRecordId, paid })
+    } catch (err) {
+      toast.error("Couldn't save that", err instanceof Error ? err.message : undefined)
+    } finally {
+      setGuestBusy(null)
+    }
   }
 
   return (
@@ -125,13 +140,13 @@ export function SettleScreen() {
                 type="button"
                 onClick={togglePaid}
                 disabled={!participantMutations.ready}
-                aria-pressed={Boolean(me.data.paid)}
+                aria-pressed={Boolean(me.paid)}
                 className={cn(
                   'h-12 rounded-xl text-[15px] font-semibold transition-colors',
-                  me.data.paid ? 'border border-success bg-success-soft text-success' : 'bg-foreground text-background',
+                  me.paid ? 'border border-success bg-success-soft text-success' : 'bg-foreground text-background',
                 )}
               >
-                {me.data.paid ? 'Marked as paid · undo' : `I paid ${hostName}`}
+                {me.paid ? 'Marked as paid · undo' : `I paid ${hostName}`}
               </button>
             )}
           </>
@@ -190,21 +205,32 @@ export function SettleScreen() {
         <h2 className="text-[13px] font-semibold uppercase tracking-[0.6px] text-muted-foreground">The table</h2>
         <ul className="flex flex-col rounded-xl border border-border bg-card px-3.5">
           {people.map((p) => {
-            const host = p.data.userId === receipt.hostId
-            const total = shareOf(p.data.userId)?.totalCents ?? 0
-            const status = host ? 'Host · paid the restaurant' : total === 0 ? 'Nothing to pay' : p.data.paid ? 'Paid' : 'Not paid yet'
+            const host = p.userId === receipt.hostId
+            const total = shareOf(p.userId)?.totalCents ?? 0
+            const status = host ? 'Host · paid the restaurant' : total === 0 ? 'Nothing to pay' : p.paid ? 'Paid' : 'Not paid yet'
             return (
-              <li key={p.recordId} className="flex items-center gap-2.5 border-b border-muted py-3 last:border-b-0">
-                <Avatar id={p.data.userId} name={p.data.displayName} size={30} />
+              <li key={p.userId} className="flex items-center gap-2.5 border-b border-muted py-3 last:border-b-0">
+                <Avatar id={p.userId} name={p.displayName} size={30} />
                 <span className="flex flex-1 flex-col">
                   <span className="font-medium">
-                    {p.data.displayName}
-                    {p.data.userId === userId && <span className="font-normal text-muted-foreground"> (you)</span>}
+                    {p.displayName}
+                    {p.userId === userId && <span className="font-normal text-muted-foreground"> (you)</span>}
+                    {p.isGuest && <span className="font-normal text-muted-foreground"> · guest</span>}
                   </span>
                   <span className={cn('text-[12.5px]', status === 'Paid' ? 'text-success' : status === 'Not paid yet' ? 'text-warning' : 'text-muted-foreground')}>
                     {status}
                   </span>
                 </span>
+                {isHost && p.isGuest && total > 0 && (
+                  <button
+                    type="button"
+                    disabled={guestBusy !== null}
+                    onClick={() => toggleGuestPaid(p.recordId, !p.paid)}
+                    className="h-9 rounded-full border border-input px-3 text-[12.5px] font-semibold hover:bg-accent disabled:opacity-50"
+                  >
+                    {p.paid ? 'Undo' : 'Mark paid'}
+                  </button>
+                )}
                 <span className="font-mono text-sm tabular-nums">{formatCents(total)}</span>
               </li>
             )

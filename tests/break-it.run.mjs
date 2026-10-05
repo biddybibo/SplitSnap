@@ -91,4 +91,38 @@ for (const [who, page] of [['FRIEND', friend], ['HOST', host]]) {
   console.log('\n=== ' + who + ' ===')
   console.table(results)
 }
+// 5. Guests + lock, end to end: Hana adds Gina, assigns the Shake to her and the Cheeseburger to herself
+//    (Felix has the Fries), locks, and the server's shares must match computeShares by hand.
+const actionAs = (page, name, params) =>
+  page.evaluate(async ([name, params]) => {
+    const { token } = await (await fetch('/api/auth/token', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' } })).json()
+    return (await fetch('/api/actions/' + name, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify(params) })).json()
+  }, [name, params])
+await host.goto(BASE + '/b/' + billId)
+await host.waitForTimeout(1500)
+const items = await host.evaluate(() => [...document.querySelectorAll('ul li button[aria-pressed]')].map((b) => b.innerText))
+const guest = await actionAs(host, 'addGuest', { billId, displayName: 'Gina' })
+log('host: addGuest ->', JSON.stringify(guest))
+const lines = await host.evaluate(async (billId) => {
+  // Read item ids the same way the break-it script does.
+  const { token } = await (await fetch('/api/auth/token', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' } })).json()
+  const ws = await new Promise((ok) => { const w = new WebSocket('wss://' + location.host + '/ws/bill:' + billId + '?token=' + encodeURIComponent(token)); w.onopen = () => ok(w) })
+  const recs = await new Promise((ok) => { ws.onmessage = (m) => { const d = JSON.parse(m.data); if (d.type === 'core.query_result') ok(d.payload.records) }; ws.send(JSON.stringify({ type: 'core.subscribe', payload: { subscriptionId: 's1', query: { collection: 'items', orderBy: 'createdAt', orderDir: 'asc' } } })) })
+  ws.close()
+  return recs.filter((r) => r.data.kind === 'item').map((r) => ({ id: r.recordId, name: r.data.name }))
+}, billId)
+const hana = findTestAccountByName('Hana').userId
+const byName = (n) => lines.find((l) => l.name.toLowerCase().includes(n)).id
+log('host: assign burger ->', JSON.stringify(await actionAs(host, 'assignItem', { billId, itemId: byName('burger'), assignments: [{ userId: hana }] })))
+log('host: assign shake to Gina ->', JSON.stringify(await actionAs(host, 'assignItem', { billId, itemId: byName('shake'), assignments: [{ userId: 'guest:' + guest.data.guestId }] })))
+log('host: lockBill ->', JSON.stringify(await actionAs(host, 'lockBill', { billId })))
+await host.goto(BASE + '/b/' + billId)
+await host.getByText('totals are final').waitFor({ timeout: 15000 })
+const settle = (await host.evaluate(() => document.body.innerText)).replace(/\s+/g, ' ')
+const expect = { Felix: '$6.54', Gina: '$7.63', Hana: '$16.35' }
+for (const [who, amount] of Object.entries(expect)) {
+  const ok = new RegExp(who + '[^$]*' + amount.replace('$', '\\$')).test(settle)
+  console.log((ok ? 'PASS' : 'FAIL') + ' settle shows ' + who + ' ' + amount)
+}
+console.log((settle.includes('Shares add up to the bill total, $30.52') ? 'PASS' : 'FAIL') + ' shares add up to $30.52')
 await browser.close()

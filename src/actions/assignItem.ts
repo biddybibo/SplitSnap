@@ -6,6 +6,9 @@
  * one sanctioned exception: it verifies the caller is the bill's host, that every
  * target already has a seat at the table, and then writes each claim *as that
  * person* (the room stamps their id), so the rows look exactly like their own taps.
+ *
+ * Guests (`guest:<guestId>`, host-added) get rows in `guestClaims` instead — this is
+ * the "claimForGuest" path, so guests and signed-in people can share one line.
  */
 
 import type { ActionHandler } from 'deepspace/worker'
@@ -39,18 +42,22 @@ export const assignItem: ActionHandler<Env> = async ({ userId, params, tools, en
   if (bill.data.record.data.hostId !== userId) return { success: false, error: 'Only the host can assign items' }
 
   const asHost = createActionTools(env, userId, callerJwt, `bill:${billId}`)
-  const [receipt, item, seats] = await Promise.all([
+  const [receipt, item, seats, guests] = await Promise.all([
     asHost.get<{ lockedAt?: string }>('receipt', 'receipt'),
     asHost.get<ItemRow>('items', itemId),
     asHost.query<{ userId: string }>('participants', { limit: 500 }),
+    asHost.query('guests', { limit: 500 }),
   ])
-  if (!receipt.success || !seats.success) return { success: false, error: 'Could not read the bill; try again' }
+  if (!receipt.success || !seats.success || !guests.success) return { success: false, error: 'Could not read the bill; try again' }
   if (receipt.data.record.data.lockedAt) return { success: false, error: 'This bill is locked' }
   if (!item.success) return { success: false, error: 'Item not found' }
   const kind = item.data.record.data.kind
   if (kind !== 'item' && kind !== 'discount') return { success: false, error: 'Only items can be assigned' }
 
-  const seated = new Set(seats.data.records.map((r) => r.data.userId))
+  const seated = new Set([
+    ...seats.data.records.map((r) => r.data.userId),
+    ...guests.data.records.map((r) => `guest:${r.recordId}`),
+  ])
   if (list.some((a) => !seated.has(a.userId))) return { success: false, error: 'Everyone assigned must be at the table' }
 
   const withUnits = list.filter((a) => a.units !== undefined).length
@@ -61,12 +68,19 @@ export const assignItem: ActionHandler<Env> = async ({ userId, params, tools, en
   }
 
   // Replace: clear the line's claims (paged, as deleteWhere caps each call), then write the new set.
-  for (;;) {
-    const cleared = await asHost.deleteWhere('claims', { itemId }, 500)
-    if (!cleared.success) return { success: false, error: 'Could not update the claims; try again' }
-    if (cleared.data.deleted < 500) break
+  for (const collection of ['claims', 'guestClaims']) {
+    for (;;) {
+      const cleared = await asHost.deleteWhere(collection, { itemId }, 500)
+      if (!cleared.success) return { success: false, error: 'Could not update the claims; try again' }
+      if (cleared.data.deleted < 500) break
+    }
   }
   for (const a of list) {
+    if (a.userId.startsWith('guest:')) {
+      const made = await asHost.create('guestClaims', { itemId, guestId: a.userId.slice(6), units: a.units ?? null })
+      if (!made.success) return { success: false, error: 'Could not save every claim; try again' }
+      continue
+    }
     // Acting as the target: claims.userId is userBound, so the room stamps *their* id on the row.
     const asThem = createActionTools(env, a.userId, callerJwt, `bill:${billId}`)
     const made = await asThem.create('claims', { itemId, units: a.units ?? null })

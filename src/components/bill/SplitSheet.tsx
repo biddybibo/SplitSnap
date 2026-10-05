@@ -159,6 +159,7 @@ export function SplitSheet({ billId, line, claims, people, meId, isHost, onClose
                   <span>
                     {p.displayName}
                     {p.userId === meId && <span className="text-muted-foreground"> (you)</span>}
+                    {p.isGuest && <span className="text-muted-foreground"> · guest</span>}
                   </span>
                   <span className={cn('font-mono text-[12.5px]', amount !== null ? 'text-primary' : 'text-muted-foreground')}>
                     {amount !== null ? formatCents(amount) : 'Not included'}

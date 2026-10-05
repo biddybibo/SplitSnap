@@ -6,21 +6,21 @@
 import { Link } from 'react-router-dom'
 import { useAuth, useQuery } from 'deepspace'
 import { ChevronLeft } from 'lucide-react'
-import { claimsByLine, type ClaimRow } from '@/lib/claims'
+import { claimsByLine } from '@/lib/claims'
 import { computeShares } from '@/lib/computeShares'
 import { formatCents } from '@/lib/money'
 import { reconcile } from '@/lib/reconcile'
-import { Avatar, type Participant } from './Table'
+import { Avatar } from './Table'
+import { useTable } from './useTable'
 import type { Item, ReceiptRow } from './types'
 
 export function SplitPreview({ billId }: { billId: string }) {
   const { userId } = useAuth()
   const receipt = useQuery<ReceiptRow>('receipt').records[0]?.data
   const items = useQuery<Item>('items', { orderBy: 'createdAt', orderDir: 'asc' }).records
-  const claims = useQuery<ClaimRow>('claims').records.map((c) => c.data)
-  const people = useQuery<Participant>('participants', { orderBy: 'createdAt', orderDir: 'asc' }).records.map(
-    (p) => p.data,
-  )
+  const table = useTable()
+  const claims = table.claims.map((c) => c.data)
+  const people = table.people
   if (!receipt) return <p className="px-5 py-10 text-center text-muted-foreground">Loading…</p>
 
   const lines = items
@@ -70,6 +70,7 @@ export function SplitPreview({ billId }: { billId: string }) {
               <span className="font-medium">
                 {p.displayName}
                 {p.userId === userId && <span className="font-normal text-muted-foreground"> (you)</span>}
+                {p.isGuest && <span className="font-normal text-muted-foreground"> · guest</span>}
               </span>
               <span className="text-[12.5px] text-muted-foreground">
                 {p.userId === receipt.hostId ? 'Host · paid the restaurant · ' : ''}
