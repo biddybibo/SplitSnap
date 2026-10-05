@@ -1,6 +1,6 @@
 # SplitSnap — writeup
 
-**Live:** https://splitsnap.app.space · **Code:** [repo link] · **Demo video:** [link, if any]
+**Live:** https://splitsnap.app.space · **Code:** https://github.com/biddybibo/SplitSnap · **Demo video:** [link, if any]
 
 ## What I built
 
