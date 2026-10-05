@@ -2,7 +2,7 @@
 
 How SplitSnap was built with an AI coding agent (Claude Code). Each entry leads with my direction, decisions and
 catches, then what the agent built. Where I took the agent's recommendation it says so; where I overrode it, it
-says that too. **Verified** lines are my own notes from testing.
+says that too.
 
 ## Decisions at a glance
 
@@ -48,7 +48,6 @@ says that too. **Verified** lines are my own notes from testing.
 - **Direction:** pick a project for the DeepSpace exercise; plan the architecture; mock the screens.
 - **Decided:** SplitSnap over the other ideas; web app, mobile-first.
 - **Agent built (planning session):** PLAN.md, CLAUDE.md, first four phone mockups.
-- **Verified:** _[your notes]_
 
 ## 2026-10-01 — Scaffold + parse spike
 - **Direction:** a throwaway signed-in action: photo → Claude → JSON, plus a bare test page.
@@ -58,7 +57,6 @@ says that too. **Verified** lines are my own notes from testing.
     spotted that the receipt itself was wrong**, so we switched to real paper receipts.
   - #2 The Tack Room (real, 6.3 s): 7 items, qty 2 read correctly as a line total, adds up exactly. Tip 0 (pre-tip
     bill) → the review screen needs a host-editable tip.
-- **Verified:** _[your notes]_
 
 ## 2026-10-01 — Design decisions: guests, reconciling totals
 - **Direction / decided:**
@@ -69,40 +67,34 @@ says that too. **Verified** lines are my own notes from testing.
     misreading the total → three-way check with the subtotal, photo beside the numbers, editable total, optional
     "amount charged to card".
 - **Agent built:** PLAN.md / CLAUDE.md updates for all of the above.
-- **Verified:** _[your notes]_
 
 ## 2026-10-02 — Schemas + permissions
 - **Direction:** every collection and permission rule from CLAUDE.md.
 - **Agent built:** all schemas plus a schema-lint test. Three changes forced by the SDK docs: guests in their own
   collection; members can't create items (host-only `addItem`); a `joinBill` action.
-- **Verified:** _[your notes — did you review each permission block against PLAN.md?]_
 
 ## 2026-10-02 — Real `parseReceipt`
 - **Direction:** production parse; switch to `generateText` + `Output.object`.
 - **Agent built:** 10-scans/day cap, three-way check, writes into each bill's own room.
 - **Tested:** receipt #3 Westin / Lona exposed a real bug — the 18% service charge was read as an item, so both
   checks falsely failed → new `fee` line type; re-test passed.
-- **Verified:** _[your notes]_
 
 ## 2026-10-02 — Start screen, review screen
 - **Direction:** upload/scan screen; review screen. Asked about duplicate receipts → **I proposed using the check
   number / timestamp**; we capture both now.
 - **Agent built:** start screen, review screen (inline edits, mismatch banner, tip, amount charged), `addItem`,
   shared reconcile math.
-- **Verified:** _[your notes]_
 
 ## 2026-10-02 — Adopting my design
 - **Direction:** compared the built screens with **my mockups**; switch to my look; keep the reconcile extras
   collapsible; pay handles on the bill, remembered for the next one.
 - **Agent built:** my palette and type, Start and Review rebuilt to my layouts, scans-left counter, pay-handle card.
-- **Verified:** _[your notes]_
 
 ## 2026-10-02 — Share, join, and the white-screen hunt
 - **Direction:** **"Share with the table" never lit up** → build share/join early.
 - **Caught:** a friend's phone stuck on a white screen. Logs showed requests answered, plus a real bug: sign-in
   returned to Home instead of the bill → fixed, and a branded loading screen replaced the blank one.
 - **Agent built:** `joinBill`, the join card, the share button rules.
-- **Verified:** _[your notes]_
 
 ## 2026-10-02 — Claim screen, logo, invite sheet
 - **Direction:** **friends couldn't tap items yet** → claim screen from my mockup; host gets the same screen plus
@@ -111,19 +103,16 @@ says that too. **Verified** lines are my own notes from testing.
 - **Caught:** the Preview button **hid behind Safari's toolbar** → unpinned; blank pages reproduced **on my laptop**
   → diagnosed as tabs open across deploys.
 - **Agent built:** claim screen, logo integration, invite sheet with a scannable QR (verified by decoding it).
-- **Verified:** _[your notes]_
 
 ## 2026-10-02 — Scope calls
 - **Phone sign-up:** **my idea**; dropped (platform sign-in is Google/GitHub only; SMS carrier registration).
 - **Claiming without an account:** **I raised it**; kept sign-in + host-added guests.
-- **Verified:** _[your notes]_
 
 ## 2026-10-02 — `computeShares`, lock and settle
 - **Direction:** asked the agent to write `computeShares` (originally mine; CLAUDE.md updated to record it). Lock
   and settle next. **My three expansion scenarios**; **I set the no-gambling line** for card roulette.
 - **Agent built:** `computeShares` (exact math, rounding remainder to the host, 2,000-bill randomized test),
   `lockBill`, Settle with prefilled pay links and "I paid".
-- **Verified:** _[your notes — check the Westin split by hand: Roy $36.25, Maya $13.05]_
 
 ## 2026-10-02 — My five "gap" boards
 - **Direction:** **my boards** for the join preview, scanning, doesn't add up, host view, and split one item.
@@ -131,7 +120,6 @@ says that too. **Verified** lines are my own notes from testing.
   limited public preview (agreed); "share anyway" with the host absorbing the gap (agreed).
 - **Then:** moved "Nobody claimed" under my own items, **then cut it** as redundant.
 - **Agent built:** all five, including AI flags on hard-to-read lines and per-person counts in the split math.
-- **Verified:** _[your notes]_
 
 ## 2026-10-04 — Safety net, settle fixes, testing
 - **Caught:** **no pay buttons on the locked page for me** → host preview of friends' buttons + editable handles.
@@ -140,13 +128,11 @@ says that too. **Verified** lines are my own notes from testing.
 - **Testing:** **I ran the full two-phone test**; asked the agent to run the break-it tests. Result: **21 / 21 attacks
   refused** on the live site (table in `tests/break-it.md`), plus a real bug found and fixed (the invite sheet
   didn't open on the first share).
-- **Verified:** _[your two-phone test notes]_
 
 ## 2026-10-04 — Guests
 - **Direction:** host-added guests, as I'd asked for on day one.
 - **Agent built:** add / remove guests, pick for a guest from the split sheet, mark a guest paid.
 - **Tested live:** guests + lock end to end matched hand math (Felix $6.54, Gina $7.63, Hana $16.35 = $30.52).
-- **Verified:** _[your notes]_
 
 ## 2026-10-04 — Refactor pass before the demo
 - **Direction:** I asked for refactors and a scaling review; chose the low-risk set and kept the data-model
@@ -156,7 +142,6 @@ says that too. **Verified** lines are my own notes from testing.
   shared `isBillId` (client checks now stricter), `dates.ts` (tests; date-only receipts no longer shift a day),
   shared avatar hash for app + public route; one photo download on Review instead of two; invite sheet + QR library
   lazy-loaded (33 KB split out); join screen polls only while visible; public preview answers from a 5 s cache.
-- **Verified:** _[your notes]_
 
 ## 2026-10-04 — README and writeup
 - **Direction:** asked for a README and a writeup drafted from AGENT_LOG and PLAN.md, framed around the work-meal
@@ -164,7 +149,6 @@ says that too. **Verified** lines are my own notes from testing.
 - **Agent built:** `README.md` (what it is, how to try it, architecture, security, tests, layout) and `WRITEUP.md`
   (decisions and trade-offs, break-it results, how I worked with the agent, DeepSpace notes, scaling, what's next,
   known limitations), with placeholders where only I can fill in.
-- **Verified:** _[your notes]_
 
 ## 2026-10-04 — Extra features: duplicates, delete, card roulette, done picking
 - **Direction:** asked what was left with spare time; chose the agent's recommended set (duplicate detection +
@@ -176,7 +160,6 @@ says that too. **Verified** lines are my own notes from testing.
   phone, Settle amounts follow the result. "I'm done picking" → Done on the host view.
 - **Tested live:** duplicate prompt on a rescan; 26/26 attacks refused (incl. rigging roulette); roulette e2e
   (Hana lost: both phones agree, Felix $0, guest unaffected, re-spin refused); delete → 404. 104 unit tests.
-- **Verified:** _[your notes]_
 
 ## 2026-10-05 — Reminders by text and email
 - **Direction:** one more feature on deadline day; **I asked for text reminders as well as email**.
@@ -188,4 +171,3 @@ says that too. **Verified** lines are my own notes from testing.
   group", per-person Text / Email, "emailed 2h ago".
 - **Tested live:** 27/27 attacks refused; Felix emailed, reply had no address, second try throttled; roulette and
   delete re-verified. 108 unit tests.
-- **Verified:** _[your notes]_
