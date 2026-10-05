@@ -1,6 +1,6 @@
 # SplitSnap — writeup
 
-**Live:** https://splitsnap.app.space · **Code:** https://github.com/biddybibo/SplitSnap · **Demo video:** **[YOU: add the link, or delete this item]**
+**Live:** https://splitsnap.app.space · **Code:** https://github.com/biddybibo/SplitSnap · **Demo video:** https://www.loom.com/share/fc8a81b570cb4a08a561d9df73600ae3
 
 **Main tradeoff:** everyone signs in, which adds a step at the table, so that every claim is tied to a verified
 person and the server can refuse forged ones. Host-added guests cover anyone who won't sign in.
@@ -94,10 +94,9 @@ own invite sheet instead of the phone's share sheet; dropping the bank check and
 - Blank pages that I reproduced on my own laptop, which pinned them on tabs left open across deploys and led to a
   reload-once safety net.
 - The Preview button hiding behind Safari's toolbar, and the host's settle page missing pay buttons.
-- **[YOU: only if you did it — e.g. "I checked `computeShares` by hand on a real receipt: …". Otherwise delete.]**
+- I checked `computeShares` by hand on a real receipt
 
-**[YOU: one or two sentences in your own words — what you'd do differently working with an agent, or what
-surprised you.]**
+Working with an agent primarily served as a way to refactor code faster, assess best optimizing architecture for the code, and automated testing. If this were to be done again I would spend more time testing myself rather than automated tests.
 
 ## Proving it's safe
 
@@ -137,13 +136,19 @@ Each bill already has its own room, so tables scale out independently. What woul
 
 ## What I'd do next
 
+- **Two-way payment confirmation.** A friend's "I paid" shows as "says they paid", and only counts once the host
+  checks their own Venmo or Cash App and taps "Got it" (a host-only server action, so a friend can't confirm
+  themselves). The prefilled payment note would carry a short code ("SplitSnap · Taqueria Luna · K7Q2") so the host
+  can match payments at a glance. Fully automatic checks aren't possible for Venmo or Cash App — no public API for
+  personal accounts — without SplitSnap processing payments itself.
 - A "claim your spot" link that turns a guest into a signed-in friend.
 - Work meals: apply a company policy ("food covered up to $X a head") after everyone claims.
 - Invite tracking ("1 link · not opened").
 
 ## Known limitations
 
-- "I paid" is self-reported; the app can't see Venmo / Cash App / PayPal transactions.
+- "I paid" is self-reported; the app can't see Venmo / Cash App / PayPal transactions. Two-way confirmation
+  by the host is the first item under "What I'd do next".
 - Sign-in needs a Google or GitHub account; guests cover everyone else.
 - The newest screens (guests, "by how many" from a friend's side) were exercised more by automated runs than by
   people at a real table.
