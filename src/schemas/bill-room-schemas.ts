@@ -211,3 +211,14 @@ export const rouletteResultSchema: CollectionSchema = {
   ],
   permissions: { '*': NO_ACCESS, viewer: READ_ONLY, member: READ_ONLY, admin: READ_ONLY },
 }
+
+/** When the host last emailed each person a reminder. Written only by remindUnpaid (throttle). */
+export const remindersSchema: CollectionSchema = {
+  name: 'reminders',
+  columns: [
+    { name: 'userId', storage: 'text', interpretation: 'plain', required: true },
+    { name: 'sentAt', storage: 'text', interpretation: 'plain' },
+  ],
+  uniqueOn: ['userId'],
+  permissions: { '*': NO_ACCESS, viewer: READ_ONLY, member: READ_ONLY, admin: READ_ONLY },
+}

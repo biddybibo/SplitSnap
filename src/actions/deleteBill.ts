@@ -10,6 +10,7 @@ import { requireHost } from '../server/bill-access'
 import type { Env } from '../../worker'
 
 const BILL_ROOM_COLLECTIONS = [
+  'reminders',
   'rouletteResult',
   'rouletteEntries',
   'claims',

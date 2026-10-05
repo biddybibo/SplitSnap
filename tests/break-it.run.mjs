@@ -133,6 +133,15 @@ for (const [who, amount] of Object.entries(expect)) {
 }
 console.log((settle.includes('Shares add up to the bill total, $30.52') ? 'PASS' : 'FAIL') + ' shares add up to $30.52')
 
+// 5b. Email reminders: Hana emails whoever still owes (Felix, at his test address). The reply must name people
+//     but never contain an email address, and a second try must hit the 6-hour limit.
+const remind1 = await actionAs(host, 'remindUnpaid', { billId })
+const r1 = JSON.stringify(remind1)
+console.log((remind1.success && /"name":"Felix","result":"sent"/.test(r1) ? 'PASS' : 'FAIL') + ' reminder emailed Felix: ' + r1.slice(0, 160))
+console.log((r1.includes('@') ? 'FAIL' : 'PASS') + ' reminder reply contains no email address')
+const remind2 = JSON.stringify(await actionAs(host, 'remindUnpaid', { billId }))
+console.log((/"name":"Felix","result":"reminded recently"/.test(remind2) ? 'PASS' : 'FAIL') + ' second reminder throttled')
+
 // 6. Card roulette: Hana and Felix opt in on their own phones, Hana spins (even odds), and the settle
 //    amounts must follow whoever lost. Gina (a guest) isn't in, so she still owes her own $7.63.
 for (const page of [friend, host]) {

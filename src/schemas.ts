@@ -21,6 +21,7 @@ import {
   sharesSchema,
   rouletteEntriesSchema,
   rouletteResultSchema,
+  remindersSchema,
 } from './schemas/bill-room-schemas'
 
 export const schemas: CollectionSchema[] = [
@@ -39,4 +40,5 @@ export const schemas: CollectionSchema[] = [
   sharesSchema,
   rouletteEntriesSchema,
   rouletteResultSchema,
+  remindersSchema,
 ]

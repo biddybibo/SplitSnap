@@ -7,11 +7,12 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth, useMutations, useQuery } from 'deepspace'
-import { ChevronLeft } from 'lucide-react'
-import { useToast } from '@/components/ui'
+import { ChevronLeft, Mail, MessageSquare } from 'lucide-react'
+import { Button, buttonVariants, useToast } from '@/components/ui'
 import { callAction } from '@/lib/actions'
 import { formatCents } from '@/lib/money'
 import { payLinks } from '@/lib/payLinks'
+import { canEmailAgain, groupReminderText, reminderText } from '@/lib/reminders'
 import { amountOwed, type RouletteResult } from '@/lib/roulette'
 import { cn } from '@/lib/utils'
 import { HandleField } from './fields'
@@ -26,6 +27,8 @@ export function SettleScreen({ billId }: { billId: string }) {
   const sharesQuery = useQuery<ShareRow>('shares')
   const table = useTable()
   const rouletteQuery = useQuery<RouletteResult & { drawnAt?: string }>('rouletteResult')
+  const remindersQuery = useQuery<{ userId: string; sentAt: string }>('reminders')
+  const [emailing, setEmailing] = useState<string | null>(null)
   const participantMutations = useMutations<Participant>('participants')
   const receiptMutations = useMutations<ReceiptRow>('receipt')
   const receiptId = useQuery<ReceiptRow>('receipt').records[0]?.recordId
@@ -57,6 +60,36 @@ export function SettleScreen({ billId }: { billId: string }) {
     if (roulette.loserId === id) return `Covers ${roulette.entrantIds.length} people (card roulette)`
     const loser = people.find((p) => p.userId === roulette.loserId)?.displayName ?? 'someone'
     return `Covered by ${roulette.loserId === userId ? 'you' : loser} (card roulette)`
+  }
+
+  const billUrl = `${window.location.origin}/b/${billId}`
+  const lastEmailed = (id: string) => remindersQuery.records.find((r) => r.data.userId === id)?.data.sentAt
+  const textHref = (body: string) => `sms:?&body=${encodeURIComponent(body)}`
+  const personalText = (p: { displayName: string; userId: string }) =>
+    reminderText({ name: p.displayName, hostName: me?.displayName ?? 'me', merchant: receipt.merchant, amountCents: owedBy(p.userId), url: billUrl })
+  const groupText = groupReminderText({
+    hostName: me?.displayName ?? 'me',
+    merchant: receipt.merchant,
+    url: billUrl,
+    owing: unpaid.map((p) => ({ name: p.displayName, amountCents: owedBy(p.userId) })),
+  })
+
+  async function emailReminders(onlyUserId?: string) {
+    setEmailing(onlyUserId ?? 'all')
+    try {
+      const res = await callAction<{ outcomes: { name: string; result: string }[] }>('remindUnpaid', {
+        billId,
+        ...(onlyUserId ? { userId: onlyUserId } : {}),
+      })
+      const sent = res.outcomes.filter((o) => o.result === 'sent').map((o) => o.name)
+      const other = res.outcomes.filter((o) => o.result !== 'sent' && o.result !== 'paid' && o.result !== 'nothing owed')
+      if (sent.length > 0) toast.success(`Emailed ${sent.join(', ')}`, other.map((o) => `${o.name}: ${o.result}`).join(' · ') || undefined)
+      else toast.warning('No emails sent', other.map((o) => `${o.name}: ${o.result}`).join(' · ') || 'Nobody needs a reminder.')
+    } catch (err) {
+      toast.error("Couldn't send reminders", err instanceof Error ? err.message : undefined)
+    } finally {
+      setEmailing(null)
+    }
   }
 
   // What friends see, for the host to check: the same links, built for an example amount.
@@ -176,6 +209,30 @@ export function SettleScreen({ billId }: { billId: string }) {
 
       <RouletteCard billId={billId} hostId={receipt.hostId} people={people} shareOf={totalOf} result={roulette} />
 
+      {isHost && unpaid.length > 0 && (
+        <section className="flex flex-col gap-3 rounded-xl border border-border bg-card px-3.5 py-3">
+          <div>
+            <h2 className="font-semibold">Still waiting on {unpaid.length} {unpaid.length === 1 ? 'person' : 'people'}</h2>
+            <p className="text-[13px] text-muted-foreground">
+              Text goes from your phone, so you pick the chat. Email goes from SplitSnap, at most once every 6 hours.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <a href={textHref(groupText)} className={cn(buttonVariants({ variant: 'outline' }), 'h-11')}>
+              <MessageSquare /> Text the group
+            </a>
+            <Button
+              variant="outline"
+              className="h-11"
+              disabled={emailing !== null || unpaid.every((p) => p.isGuest)}
+              onClick={() => emailReminders()}
+            >
+              <Mail /> {emailing === 'all' ? 'Sending…' : 'Email all'}
+            </Button>
+          </div>
+        </section>
+      )}
+
       {isHost && (
         <section className="flex flex-col gap-3 rounded-xl border border-border bg-card px-3.5 py-3">
           <div className="flex items-start justify-between gap-3">
@@ -248,8 +305,32 @@ export function SettleScreen({ billId }: { billId: string }) {
                   </span>
                   <span className={cn('text-[12.5px]', status === 'Paid' ? 'text-success' : status === 'Not paid yet' ? 'text-warning' : 'text-muted-foreground')}>
                     {status}
+                    {isHost && !p.paid && lastEmailed(p.userId) && ` · emailed ${shortAgo(lastEmailed(p.userId)!)}`}
                   </span>
                 </span>
+                {isHost && !host && total > 0 && !p.paid && (
+                  <span className="flex gap-1">
+                    <a
+                      href={textHref(personalText(p))}
+                      aria-label={`Text ${p.displayName} a reminder`}
+                      className="flex size-9 items-center justify-center rounded-full border border-input hover:bg-accent"
+                    >
+                      <MessageSquare className="size-4" />
+                    </a>
+                    {!p.isGuest && (
+                      <button
+                        type="button"
+                        aria-label={`Email ${p.displayName} a reminder`}
+                        title={lastEmailed(p.userId) ? `Emailed ${shortAgo(lastEmailed(p.userId)!)}` : undefined}
+                        disabled={emailing !== null || !canEmailAgain(lastEmailed(p.userId))}
+                        onClick={() => emailReminders(p.userId)}
+                        className="flex size-9 items-center justify-center rounded-full border border-input hover:bg-accent disabled:opacity-40"
+                      >
+                        <Mail className="size-4" />
+                      </button>
+                    )}
+                  </span>
+                )}
                 {isHost && p.isGuest && total > 0 && (
                   <button
                     type="button"
@@ -278,4 +359,11 @@ function BreakdownRow({ label, cents }: { label: string; cents: number }) {
       <span className="font-mono tabular-nums">{formatCents(cents)}</span>
     </div>
   )
+}
+
+function shortAgo(iso: string): string {
+  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000))
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  return `${Math.round(mins / 60)}h ago`
 }

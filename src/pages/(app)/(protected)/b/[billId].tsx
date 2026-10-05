@@ -23,6 +23,7 @@ import {
   itemsSchema,
   participantsSchema,
   receiptSchema,
+  remindersSchema,
   rouletteEntriesSchema,
   rouletteResultSchema,
   sharesSchema,
@@ -42,6 +43,7 @@ export default function BillPage() {
         sharesSchema,
         rouletteEntriesSchema,
         rouletteResultSchema,
+        remindersSchema,
       ]} isolated>
       <BillRouter billId={billId} />
     </RecordScope>

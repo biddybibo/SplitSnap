@@ -134,6 +134,9 @@ check 2, and check 1 if the server stamps instead of refusing) are deleted again
     record('17. Opt someone else into roulette', !entry || entry.data.userId !== hostId,
       entry ? `stored as ${entry.data.userId === me ? 'me (userBound)' : entry.data.userId}` : `refused: ${r17.error}`)
     if (entry) await del(bill, 'rouletteEntries', entryId)
+    // 18. Reminders are host-only (and would read people's emails on the server).
+    const r18 = await action('remindUnpaid', { billId })
+    record('18. Send reminder emails', refused(r18), r18.error ?? 'accepted')
   } else {
     // Even the host can't lock by hand or write the shares: only lockBill can.
     const h1 = await put(bill, 'receipt', 'receipt', { lockedAt: new Date().toISOString() })
@@ -188,6 +191,7 @@ check 2, and check 1 if the server stamps instead of refusing) are deleted again
 | 15 | Spin the roulette | "Only the host…" | `spinRoulette` via `requireHost` |
 | 16, H5 | Write the roulette result to rig it | Refused | `rouletteResult`: no member writes, even the host |
 | 17 | Opt someone else into roulette | Refused, or stored under **your** id | `rouletteEntries.userId` is `userBound` |
+| 18 | Send reminder emails | "Only the host…" | `remindUnpaid` via `requireHost` |
 | H1–H2 | Host locks or writes shares by hand | Refused | `lockedAt` not in host `writableFields`; `shares` no writes |
 | H3 | Host adds a line without `addItem` | Refused | `items` create `false` for everyone |
 | H4 | Host marks a friend paid | Refused | `participants` update `own` |
