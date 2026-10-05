@@ -7,6 +7,7 @@ import { addGuest, removeGuest, setGuestPaid } from './guests'
 import { joinBill } from './joinBill'
 import { lockBill } from './lockBill'
 import { parseReceipt } from './parseReceipt'
+import { spinRoulette } from './spinRoulette'
 import { scansLeft } from './usage'
 
 export const actions: Record<string, ActionHandler<Env>> = {
@@ -20,4 +21,5 @@ export const actions: Record<string, ActionHandler<Env>> = {
   removeGuest,
   scansLeft,
   setGuestPaid,
+  spinRoulette,
 }

@@ -11,6 +11,7 @@ export interface Participant {
   userId: string
   displayName: string
   paid: number
+  done?: number
   /** Host-added guest (no account); userId is `guest:<guestId>`. */
   isGuest?: boolean
 }

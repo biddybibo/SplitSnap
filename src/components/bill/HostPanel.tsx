@@ -69,7 +69,9 @@ export function HostPanel({ meId, lines, byLine, people, hereIds, claimCounts }:
                     {p.userId === meId && <span className="text-muted-foreground"> (you)</span>}
                     {p.isGuest && <span className="text-muted-foreground"> · guest</span>}
                   </span>
-                  {p.isGuest && n === 0 ? (
+                  {p.done ? (
+                    <span className="text-[12.5px] font-semibold text-success">Done{n > 0 ? ` · ${n} picked` : ''}</span>
+                  ) : p.isGuest && n === 0 ? (
                     <span className="text-[12.5px] text-muted-foreground">Guest · pick for them</span>
                   ) : n > 0 ? (
                     <span className="text-[12.5px] font-semibold text-success">Picked {n}</span>

@@ -23,6 +23,8 @@ import {
   itemsSchema,
   participantsSchema,
   receiptSchema,
+  rouletteEntriesSchema,
+  rouletteResultSchema,
   sharesSchema,
 } from '../../../../schemas/bill-room-schemas'
 
@@ -30,7 +32,17 @@ export default function BillPage() {
   const { billId } = useParams()
   if (!billId) return null
   return (
-    <RecordScope roomId={`bill:${billId}`} schemas={[receiptSchema, itemsSchema, participantsSchema, claimsSchema, guestsSchema, guestClaimsSchema, sharesSchema]} isolated>
+    <RecordScope roomId={`bill:${billId}`} schemas={[
+        receiptSchema,
+        itemsSchema,
+        participantsSchema,
+        claimsSchema,
+        guestsSchema,
+        guestClaimsSchema,
+        sharesSchema,
+        rouletteEntriesSchema,
+        rouletteResultSchema,
+      ]} isolated>
       <BillRouter billId={billId} />
     </RecordScope>
   )

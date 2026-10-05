@@ -132,14 +132,16 @@ export const participantsSchema: CollectionSchema = {
     { name: 'userId', storage: 'text', interpretation: 'plain', userBound: true, immutable: true },
     { name: 'displayName', storage: 'text', interpretation: 'plain' },
     { name: 'paid', storage: 'number', interpretation: { kind: 'boolean' }, default: 0 },
+    // "I'm done picking" — shown to the host as Done.
+    { name: 'done', storage: 'number', interpretation: { kind: 'boolean' }, default: 0 },
   ],
   uniqueOn: ['userId'],
   ownerField: 'userId',
   permissions: {
     '*': NO_ACCESS,
     viewer: READ_ONLY,
-    member: { read: true, create: true, update: 'own', delete: false, writableFields: ['displayName', 'paid'] },
-    admin: { read: true, create: true, update: 'own', delete: false, writableFields: ['displayName', 'paid'] },
+    member: { read: true, create: true, update: 'own', delete: false, writableFields: ['displayName', 'paid', 'done'] },
+    admin: { read: true, create: true, update: 'own', delete: false, writableFields: ['displayName', 'paid', 'done'] },
   },
 }
 
@@ -181,5 +183,31 @@ export const sharesSchema: CollectionSchema = {
     { name: 'totalCents', storage: 'number', interpretation: 'plain' },
   ],
   uniqueOn: ['userId'],
+  permissions: { '*': NO_ACCESS, viewer: READ_ONLY, member: READ_ONLY, admin: READ_ONLY },
+}
+
+/** Card roulette opt-ins: "I'm in". Each person adds or removes only their own (userBound). */
+export const rouletteEntriesSchema: CollectionSchema = {
+  name: 'rouletteEntries',
+  columns: [{ name: 'userId', storage: 'text', interpretation: 'plain', userBound: true, immutable: true }],
+  uniqueOn: ['userId'],
+  ownerField: 'userId',
+  permissions: {
+    '*': NO_ACCESS,
+    viewer: READ_ONLY,
+    member: { read: true, create: true, update: false, delete: 'own' },
+    admin: { read: true, create: true, update: false, delete: 'own' },
+  },
+}
+
+/** The one card-roulette draw for a bill. Written only by spinRoulette; nobody can edit or re-roll it. */
+export const rouletteResultSchema: CollectionSchema = {
+  name: 'rouletteResult',
+  columns: [
+    { name: 'loserId', storage: 'text', interpretation: 'plain', required: true },
+    { name: 'mode', storage: 'text', interpretation: { kind: 'select', options: ['even', 'weighted'] } },
+    { name: 'entrantIds', storage: 'text', interpretation: { kind: 'json' } },
+    { name: 'drawnAt', storage: 'text', interpretation: 'plain' },
+  ],
   permissions: { '*': NO_ACCESS, viewer: READ_ONLY, member: READ_ONLY, admin: READ_ONLY },
 }

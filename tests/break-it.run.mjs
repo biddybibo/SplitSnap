@@ -133,7 +133,30 @@ for (const [who, amount] of Object.entries(expect)) {
 }
 console.log((settle.includes('Shares add up to the bill total, $30.52') ? 'PASS' : 'FAIL') + ' shares add up to $30.52')
 
-// 6. Clean up: the host deletes the test bill; it must be gone for everyone.
+// 6. Card roulette: Hana and Felix opt in on their own phones, Hana spins (even odds), and the settle
+//    amounts must follow whoever lost. Gina (a guest) isn't in, so she still owes her own $7.63.
+for (const page of [friend, host]) {
+  await page.goto(BASE + '/b/' + billId)
+  await page.getByRole('button', { name: /^I.m in$/ }).click({ timeout: 15000 })
+  await page.getByRole('button', { name: /I.m in · tap to leave/ }).waitFor({ timeout: 10000 })
+}
+log('both opted in')
+await host.getByRole('button', { name: /^Spin for 2 people/ }).click({ timeout: 15000 })
+await host.getByText(/covers \$\d/).waitFor({ timeout: 15000 })
+const after = (await host.evaluate(() => document.body.innerText)).replace(/\s+/g, ' ')
+const felixLost = /Felix covers/.test(after)
+log('roulette:', felixLost ? 'Felix lost' : 'Hana lost')
+const rouletteChecks = felixLost
+  ? [['Felix', '$22.89'], ['Gina', '$7.63']] // 16.35 + 6.54
+  : [['Felix', '$0.00'], ['Gina', '$7.63']]
+for (const [who, amount] of rouletteChecks) {
+  const ok = new RegExp(who + '[^$]*' + amount.replace('$', '\\$')).test(after)
+  console.log((ok ? 'PASS' : 'FAIL') + ' after roulette ' + who + ' owes ' + amount)
+}
+const respin = await actionAs(host, 'spinRoulette', { billId, mode: 'even' })
+console.log((respin.success ? 'FAIL' : 'PASS') + ' second spin refused: ' + (respin.error ?? 'accepted'))
+
+// 7. Clean up: the host deletes the test bill; it must be gone for everyone.
 log('host: deleteBill ->', JSON.stringify(await actionAs(host, 'deleteBill', { billId })))
 const gone = await host.evaluate(async (id) => (await fetch('/api/public/bills/' + id)).status, billId)
 console.log((gone === 404 ? 'PASS' : 'FAIL') + ' deleted bill is gone (public preview ' + gone + ')')

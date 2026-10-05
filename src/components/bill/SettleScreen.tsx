@@ -12,8 +12,10 @@ import { useToast } from '@/components/ui'
 import { callAction } from '@/lib/actions'
 import { formatCents } from '@/lib/money'
 import { payLinks } from '@/lib/payLinks'
+import { amountOwed, type RouletteResult } from '@/lib/roulette'
 import { cn } from '@/lib/utils'
 import { HandleField } from './fields'
+import { RouletteCard } from './RouletteCard'
 import { Avatar, type Participant } from './Table'
 import { useTable } from './useTable'
 import type { ReceiptRow, ShareRow } from './types'
@@ -23,6 +25,7 @@ export function SettleScreen({ billId }: { billId: string }) {
   const receipt = useQuery<ReceiptRow>('receipt').records[0]?.data
   const sharesQuery = useQuery<ShareRow>('shares')
   const table = useTable()
+  const rouletteQuery = useQuery<RouletteResult & { drawnAt?: string }>('rouletteResult')
   const participantMutations = useMutations<Participant>('participants')
   const receiptMutations = useMutations<ReceiptRow>('receipt')
   const receiptId = useQuery<ReceiptRow>('receipt').records[0]?.recordId
@@ -41,10 +44,20 @@ export function SettleScreen({ billId }: { billId: string }) {
   const hostName = people.find((p) => p.userId === receipt.hostId)?.displayName ?? 'the host'
   const me = people.find((p) => p.userId === userId)
   const mine = userId ? shareOf(userId) : undefined
-  const owed = mine?.totalCents ?? 0
+  const roulette = rouletteQuery.records[0]?.data ?? null
+  const totalOf = (id: string) => shareOf(id)?.totalCents ?? 0
+  // What each person actually owes the host, after card roulette (if it ran).
+  const owedBy = (id: string) => amountOwed(id, receipt.hostId, totalOf, roulette)
+  const owed = isHost ? (mine?.totalCents ?? 0) : userId ? owedBy(userId) : 0
   const billTotal = shares.reduce((s, x) => s + x.totalCents, 0)
   const links = payLinks(receipt, owed, `${receipt.merchant} (SplitSnap)`)
-  const unpaid = people.filter((p) => p.userId !== receipt.hostId && !p.paid && (shareOf(p.userId)?.totalCents ?? 0) > 0)
+  const unpaid = people.filter((p) => p.userId !== receipt.hostId && !p.paid && owedBy(p.userId) > 0)
+  const rouletteNote = (id: string): string | null => {
+    if (!roulette || !roulette.entrantIds.includes(id)) return null
+    if (roulette.loserId === id) return `Covers ${roulette.entrantIds.length} people (card roulette)`
+    const loser = people.find((p) => p.userId === roulette.loserId)?.displayName ?? 'someone'
+    return `Covered by ${roulette.loserId === userId ? 'you' : loser} (card roulette)`
+  }
 
   // What friends see, for the host to check: the same links, built for an example amount.
   const previewLinks = payLinks(receipt, 100, '')
@@ -151,8 +164,17 @@ export function SettleScreen({ billId }: { billId: string }) {
             )}
           </>
         )}
-        {!isHost && owed === 0 && <p className="text-sm text-muted-foreground">You don&apos;t owe anything on this bill.</p>}
+        {!isHost && owed === 0 && (
+          <p className="text-sm text-muted-foreground">
+            {userId && rouletteNote(userId) ? `${rouletteNote(userId)} — you owe nothing.` : 'You don’t owe anything on this bill.'}
+          </p>
+        )}
+        {!isHost && owed > 0 && userId && roulette?.loserId === userId && (
+          <p className="text-sm font-medium text-primary">Card roulette: you’re covering everyone who was in.</p>
+        )}
       </section>
+
+      <RouletteCard billId={billId} hostId={receipt.hostId} people={people} shareOf={totalOf} result={roulette} />
 
       {isHost && (
         <section className="flex flex-col gap-3 rounded-xl border border-border bg-card px-3.5 py-3">
@@ -206,8 +228,15 @@ export function SettleScreen({ billId }: { billId: string }) {
         <ul className="flex flex-col rounded-xl border border-border bg-card px-3.5">
           {people.map((p) => {
             const host = p.userId === receipt.hostId
-            const total = shareOf(p.userId)?.totalCents ?? 0
-            const status = host ? 'Host · paid the restaurant' : total === 0 ? 'Nothing to pay' : p.paid ? 'Paid' : 'Not paid yet'
+            const total = host ? totalOf(p.userId) : owedBy(p.userId)
+            const note = rouletteNote(p.userId)
+            const status = host
+              ? 'Host · paid the restaurant'
+              : total === 0
+                ? note ?? 'Nothing to pay'
+                : p.paid
+                  ? 'Paid'
+                  : note ? `${note} · not paid yet` : 'Not paid yet'
             return (
               <li key={p.userId} className="flex items-center gap-2.5 border-b border-muted py-3 last:border-b-0">
                 <Avatar id={p.userId} name={p.displayName} size={30} />

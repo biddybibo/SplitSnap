@@ -33,6 +33,7 @@ export function ClaimScreen({ billId }: { billId: string }) {
   const itemsQuery = useQuery<Item>('items', { orderBy: 'createdAt', orderDir: 'asc' })
   const table = useTable()
   const claimMutations = useMutations<{ itemId: string; units?: number | null }>('claims')
+  const participantMutations = useMutations<{ done: number }>('participants')
   const { peers } = usePresenceRoom(`bill:${billId}`)
   const toast = useToast()
   const [pending, setPending] = useState<Set<string>>(new Set())
@@ -114,8 +115,14 @@ export function ClaimScreen({ billId }: { billId: string }) {
   const hereIds = new Set([...(userId ? [userId] : []), ...peers.map((p) => p.userId)])
   const hereCount = people.filter((p) => hereIds.has(p.userId)).length
   const stillPicking = people.filter(
-    (p) => hereIds.has(p.userId) && !claims.some((c) => c.data.userId === p.userId),
+    (p) => hereIds.has(p.userId) && !p.done && !claims.some((c) => c.data.userId === p.userId),
   )
+  const myRow = me ? table.people.find((p) => p.userId === userId && !p.isGuest) : undefined
+
+  function toggleDone() {
+    if (!myRow || !participantMutations.ready) return
+    participantMutations.put(myRow.recordId, { done: myRow.done ? 0 : 1 }).catch(() => toast.error("Couldn't save that"))
+  }
 
   async function toggle(lineId: string) {
     if (!canClaim || pending.has(lineId)) return
@@ -283,6 +290,18 @@ export function ClaimScreen({ billId }: { billId: string }) {
             {unclaimed === 1 ? '1 item still unclaimed' : `${unclaimed} items still unclaimed`}, so the host can&apos;t
             lock the bill yet.
           </p>
+        )}
+        {myRow && !isHost && (
+          <Button
+            variant={myRow.done ? 'outline' : 'secondary'}
+            size="lg"
+            className={cn('h-12 text-base', myRow.done && 'border-success text-success')}
+            disabled={!participantMutations.ready}
+            aria-pressed={Boolean(myRow.done)}
+            onClick={toggleDone}
+          >
+            {myRow.done ? 'Done picking · tap to keep picking' : 'I’m done picking'}
+          </Button>
         )}
         {isHost && (
           <>

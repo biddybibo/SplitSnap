@@ -9,7 +9,17 @@ import type { ActionHandler } from 'deepspace/worker'
 import { requireHost } from '../server/bill-access'
 import type { Env } from '../../worker'
 
-const BILL_ROOM_COLLECTIONS = ['claims', 'guestClaims', 'shares', 'participants', 'guests', 'items', 'receipt']
+const BILL_ROOM_COLLECTIONS = [
+  'rouletteResult',
+  'rouletteEntries',
+  'claims',
+  'guestClaims',
+  'shares',
+  'participants',
+  'guests',
+  'items',
+  'receipt',
+]
 
 export const deleteBill: ActionHandler<Env> = async (ctx) => {
   const host = await requireHost(ctx, ctx.params.billId, { action: 'delete the bill', allowLocked: true })

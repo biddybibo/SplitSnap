@@ -123,6 +123,17 @@ check 2, and check 1 if the server stamps instead of refusing) are deleted again
     record('13. Mark a guest paid', refused(r13), r13.error ?? 'accepted')
     const r14 = await action('deleteBill', { billId })
     record('14. Delete the bill', refused(r14), r14.error ?? 'accepted')
+    // 15–17. Card roulette can't be rigged.
+    const r15 = await action('spinRoulette', { billId, mode: 'even' })
+    record('15. Spin the roulette', refused(r15), r15.error ?? 'accepted')
+    const r16 = await put(bill, 'rouletteResult', 'result', { loserId: hostId, mode: 'even', entrantIds: [me, hostId] })
+    record('16. Write the roulette result', refused(r16), r16.error ?? 'accepted')
+    const entryId = id()
+    const r17 = await put(bill, 'rouletteEntries', entryId, { userId: hostId })
+    const entry = (await read(bill, 'rouletteEntries')).find((e) => e.recordId === entryId)
+    record('17. Opt someone else into roulette', !entry || entry.data.userId !== hostId,
+      entry ? `stored as ${entry.data.userId === me ? 'me (userBound)' : entry.data.userId}` : `refused: ${r17.error}`)
+    if (entry) await del(bill, 'rouletteEntries', entryId)
   } else {
     // Even the host can't lock by hand or write the shares: only lockBill can.
     const h1 = await put(bill, 'receipt', 'receipt', { lockedAt: new Date().toISOString() })
@@ -136,6 +147,8 @@ check 2, and check 1 if the server stamps instead of refusing) are deleted again
       const h4 = await put(bill, 'participants', friend.recordId, { paid: 1 })
       record("H4. Host marks a friend paid", refused(h4), h4.error ?? 'accepted')
     }
+    const h5 = await put(bill, 'rouletteResult', 'result', { loserId: friend?.data.userId ?? me, mode: 'even', entrantIds: [] })
+    record('H5. Host writes the roulette result by hand', refused(h5), h5.error ?? 'accepted')
   }
 
   // Everyone: the app room's private AI-usage table. (The app id is public; it's in wrangler.toml.)
@@ -172,6 +185,9 @@ check 2, and check 1 if the server stamps instead of refusing) are deleted again
 | 11, 13 | Add a guest / mark a guest paid | "Only the host…" | `addGuest`, `setGuestPaid` check `bills.hostId` |
 | 12 | Write a guest claim directly | Refused | `guestClaims`: no member writes |
 | 14 | Delete the bill | "Only the host…" | `deleteBill` via `requireHost` |
+| 15 | Spin the roulette | "Only the host…" | `spinRoulette` via `requireHost` |
+| 16, H5 | Write the roulette result to rig it | Refused | `rouletteResult`: no member writes, even the host |
+| 17 | Opt someone else into roulette | Refused, or stored under **your** id | `rouletteEntries.userId` is `userBound` |
 | H1–H2 | Host locks or writes shares by hand | Refused | `lockedAt` not in host `writableFields`; `shares` no writes |
 | H3 | Host adds a line without `addItem` | Refused | `items` create `false` for everyone |
 | H4 | Host marks a friend paid | Refused | `participants` update `own` |

@@ -19,6 +19,8 @@ import {
   guestsSchema,
   guestClaimsSchema,
   sharesSchema,
+  rouletteEntriesSchema,
+  rouletteResultSchema,
 } from './schemas/bill-room-schemas'
 
 export const schemas: CollectionSchema[] = [
@@ -35,4 +37,6 @@ export const schemas: CollectionSchema[] = [
   guestsSchema,
   guestClaimsSchema,
   sharesSchema,
+  rouletteEntriesSchema,
+  rouletteResultSchema,
 ]
