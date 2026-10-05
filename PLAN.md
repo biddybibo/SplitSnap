@@ -1,5 +1,9 @@
 # SplitSnap — Build Plan
 
+> **Note:** this is the original plan from day one. Some names changed while building: `claimForGuest` became
+> `assignItem` with a `guest:<id>`, and `nudgeUnpaid` (Resend) became `remindUnpaid` (`email/send`). See README.md
+> and WRITEUP.md for what was built.
+
 As of Oct 1, 2026 · Deadline Mon Oct 5, 8:59 PM PT (11:59 PM ET), target Monday afternoon.
 
 ## Scope

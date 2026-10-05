@@ -82,7 +82,7 @@ Full spec: `PLAN.md`. Read it before starting any new slice of work.
 - `items`: `ownerField: hostId` (userBound) — only the host edits/deletes; create false (actions only).
 - `claims`: `userId` is `userBound` + `immutable`; `uniqueOn: [itemId, userId]`; update/delete `own`.
 - `receipt`: `ownerField: hostId` — only the host edits the printed numbers / amount charged.
-- `guestClaims`: read true, no member writes; written only by `claimForGuest`.
+- `guestClaims`: read true, no member writes; written only by `assignItem` (host-only, `guest:<guestId>`).
 - `participants`: create true, update `own` (the "I paid" toggle), `uniqueOn: [userId]`.
 - `guests`: read true, no member writes; written only by `addGuest`.
 - `shares`: no member writes; written only by `lockBill`.
@@ -103,7 +103,7 @@ Full spec: `PLAN.md`. Read it before starting any new slice of work.
 
 ## Out of scope
 Moving money in-app, multi-currency, receipt history/analytics, native mobile app,
-reading bank transactions. Stretch only if the core path works: host-added guests, Resend nudges, daily reminder
+reading bank transactions. Stretch only if the core path works: host-added guests (built), email nudges (built as `remindUnpaid`), daily reminder
 cron, presence indicator. Future: "claim your spot" link for guests via the share sheet.
 
 ## Core path that must work on the deployed URL

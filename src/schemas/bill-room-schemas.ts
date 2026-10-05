@@ -155,7 +155,7 @@ export const guestsSchema: CollectionSchema = {
   permissions: { '*': NO_ACCESS, viewer: READ_ONLY, member: READ_ONLY, admin: READ_ONLY },
 }
 
-/** Claims the host makes for a guest (stretch). Written only by claimForGuest. */
+/** Claims the host makes for a guest. Written only by assignItem (host-only) with `guest:<guestId>`. */
 export const guestClaimsSchema: CollectionSchema = {
   name: 'guestClaims',
   columns: [
