@@ -27,6 +27,10 @@ You need two phones (or a phone and a laptop) and a Google or GitHub account on 
 6. **Optional — card roulette:** everyone who taps "I'm in" puts their share in, the host spins, and every phone
    watches the same reveal of who covers it all. Just for fun; one spin per bill.
 
+**Trying it alone?** One account is enough. Scan a receipt, tap **Share with the table** (you don't have to send
+the link), then claim every item yourself — or add a guest and pick items for them to see a split — and lock.
+Locking only needs every item claimed and the numbers to add up.
+
 Scanning the same receipt twice is caught ("You already scanned this receipt"), the host can delete bills, and the
 host can nudge people who haven't paid — by text from their own phone, or by email from SplitSnap.
 

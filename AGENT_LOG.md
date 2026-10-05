@@ -16,16 +16,16 @@ says that too.
 | Phone-number sign-up with a code | **My idea** | Dropped: the platform's sign-in is Google/GitHub only and SMS needs carrier registration; guests cover it |
 | Let people claim without an account (from the QR code) | **I raised it** | Kept sign-in + host-added guests after the trade-offs |
 | Visual design | **My mockups** (Start, Review, Claim, Settle) | Replace the agent's interim theme with mine; keep the reconcile extras in a collapsible section; pay handles on the bill, remembered for next time |
-| Invite flow | **My design** (own invite sheet, QR "scan at the table") | Replace the OS share sheet |
+| Invite flow | Invite sheet design (own sheet, QR "scan at the table") drafted with Claude in the planning session | **My call:** replace the OS share sheet with it |
 | Logo | **My logo files**, then I asked for the receipt lines in the mark | Implemented as given |
 | `computeShares` | Originally mine to write | Asked the agent to write it; I review and verify it |
 | Expansion directions | **My three scenarios**: pay at the table for restaurants, policy-aware work meals, card roulette | Restaurants and full work-meal product → writeup; roulette only as a lighthearted "who covers the bill" game — **I drew the no-gambling line** |
-| Five "gap" screens | **My design boards** (join preview, scanning, doesn't add up, host view, split one item) | Built all five |
+| Five "gap" screens | Drafted with Claude in the planning session (join preview, scanning, doesn't add up, host view, split one item) | Chose to build all five; made the calls on each (below) |
 | Host assigns items for others | Agent recommended a host-only action | Agreed |
 | Split one item "by how many" | Agent recommended deferring it (out of scope) | **Overrode: build it** |
 | Public preview before sign-in | Agent recommended a limited read-only preview | Agreed |
 | "Share anyway" when it doesn't add up | Agent recommended the host absorbs the gap | Agreed |
-| "Nobody claimed" section on the host view | Built from my board | **I moved it, then cut it** as redundant with "Nobody yet" on each item |
+| "Nobody claimed" section on the host view | Built from the host-view board | **I moved it, then cut it** as redundant with "Nobody yet" on each item |
 | Pinned bottom buttons | Agent pinned them | **I asked to unpin them** (they hid behind Safari's toolbar) |
 
 ## Things I caught
@@ -47,7 +47,7 @@ says that too.
 ## 2026-10-01 — Planning
 - **Direction:** pick a project for the DeepSpace exercise; plan the architecture; mock the screens.
 - **Decided:** SplitSnap over the other ideas; web app, mobile-first.
-- **Agent built (planning session):** PLAN.md, CLAUDE.md, first four phone mockups.
+- **Agent built (planning session):** PLAN.md, CLAUDE.md. The four phone mockups are mine.
 
 ## 2026-10-01 — Scaffold + parse spike
 - **Direction:** a throwaway signed-in action: photo → Claude → JSON, plus a bare test page.
@@ -98,8 +98,8 @@ says that too.
 
 ## 2026-10-02 — Claim screen, logo, invite sheet
 - **Direction:** **friends couldn't tap items yet** → claim screen from my mockup; host gets the same screen plus
-  editing. **My logo files** (then **the receipt lines in the mark**). **My Invite sheet design** replacing the
-  phone's share sheet; confirmed the QR should be real.
+  editing. **My logo files** (then **the receipt lines in the mark**). The invite sheet design (drafted with Claude in planning) replacing
+  the phone's share sheet; confirmed the QR should be real.
 - **Caught:** the Preview button **hid behind Safari's toolbar** → unpinned; blank pages reproduced **on my laptop**
   → diagnosed as tabs open across deploys.
 - **Agent built:** claim screen, logo integration, invite sheet with a scannable QR (verified by decoding it).
@@ -114,8 +114,8 @@ says that too.
 - **Agent built:** `computeShares` (exact math, rounding remainder to the host, 2,000-bill randomized test),
   `lockBill`, Settle with prefilled pay links and "I paid".
 
-## 2026-10-02 — My five "gap" boards
-- **Direction:** **my boards** for the join preview, scanning, doesn't add up, host view, and split one item.
+## 2026-10-02 — The five "gap" boards
+- **Direction:** build the boards drafted with Claude in planning: the join preview, scanning, doesn't add up, host view, and split one item.
 - **Decided:** host-only assignment (agreed); **build "by how many" against the agent's advice to defer it**;
   limited public preview (agreed); "share anyway" with the host absorbing the gap (agreed).
 - **Then:** moved "Nobody claimed" under my own items, **then cut it** as redundant.
@@ -171,3 +171,11 @@ says that too.
   group", per-person Text / Email, "emailed 2h ago".
 - **Tested live:** 27/27 attacks refused; Felix emailed, reply had no address, second try throttled; roulette and
   delete re-verified. 108 unit tests.
+
+## 2026-10-05 — Submission docs
+- **Direction:** I pasted outside feedback and the task brief; asked to match the writeup to the five things the
+  portal note must cover, and to fix who made what (the gap boards and invite sheet were drafted with Claude; the
+  mockups, logo and expansion scenarios are mine).
+- **Agent built:** WRITEUP restructured (one main tradeoff, integrations used / skipped / built myself, what the agent
+  did vs. what I directed and verified, market pitch removed); README "trying it alone"; this log corrected; the
+  portal note. Left marked spots for my own words and my hand-check.
