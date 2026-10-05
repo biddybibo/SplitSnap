@@ -157,3 +157,11 @@ says that too. **Verified** lines are my own notes from testing.
   shared avatar hash for app + public route; one photo download on Review instead of two; invite sheet + QR library
   lazy-loaded (33 KB split out); join screen polls only while visible; public preview answers from a 5 s cache.
 - **Verified:** _[your notes]_
+
+## 2026-10-04 — README and writeup
+- **Direction:** asked for a README and a writeup drafted from AGENT_LOG and PLAN.md, framed around the work-meal
+  direction as the most original next step.
+- **Agent built:** `README.md` (what it is, how to try it, architecture, security, tests, layout) and `WRITEUP.md`
+  (decisions and trade-offs, break-it results, how I worked with the agent, DeepSpace notes, scaling, what's next,
+  known limitations), with placeholders where only I can fill in.
+- **Verified:** _[your notes]_
