@@ -142,7 +142,8 @@ for (const page of [friend, host]) {
 }
 log('both opted in')
 await host.getByRole('button', { name: /^Spin for 2 people/ }).click({ timeout: 15000 })
-await host.getByText(/covers \$\d/).waitFor({ timeout: 15000 })
+// The loser's own screen says "You cover", everyone else's "<name> covers".
+await host.getByText(/covers? \$\d/).waitFor({ timeout: 15000 })
 const after = (await host.evaluate(() => document.body.innerText)).replace(/\s+/g, ' ')
 const felixLost = /Felix covers/.test(after)
 log('roulette:', felixLost ? 'Felix lost' : 'Hana lost')
@@ -158,6 +159,7 @@ console.log((respin.success ? 'FAIL' : 'PASS') + ' second spin refused: ' + (res
 
 // 7. Clean up: the host deletes the test bill; it must be gone for everyone.
 log('host: deleteBill ->', JSON.stringify(await actionAs(host, 'deleteBill', { billId })))
+await host.waitForTimeout(5500) // the public preview caches answers for 5 s
 const gone = await host.evaluate(async (id) => (await fetch('/api/public/bills/' + id)).status, billId)
 console.log((gone === 404 ? 'PASS' : 'FAIL') + ' deleted bill is gone (public preview ' + gone + ')')
 await browser.close()

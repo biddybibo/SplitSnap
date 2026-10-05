@@ -230,3 +230,22 @@ Hana added guest Gina, assigned the Shake to her and the Cheeseburger to herself
 locked. `lockBill` → `{ totalCents: 3052, people: 3 }`. Settle showed **Felix $6.54** ($6.00 + $0.54 tax),
 **Gina $7.63** ($7.00 + $0.63), **Hana $16.35** (the rest), and "Shares add up to the bill total, $30.52" —
 matching computeShares by hand.
+
+### After duplicates, delete, card roulette and "done picking" (bill 4d51cbd7…)
+
+**26 / 26 attacks refused** (19 as the friend, 7 as the host), adding:
+
+| Check | Server's answer |
+|---|---|
+| 14. Delete the bill | `Only the host can delete the bill` |
+| 15. Spin the roulette | `Only the host can spin` |
+| 16. Write the roulette result | `CREATE DENIED: role=member, collection=rouletteResult` |
+| 17. Opt someone else into roulette | stored under the caller's own id (`userBound`) |
+| H5. Host writes the roulette result by hand | `CREATE DENIED: role=member, collection=rouletteResult` |
+
+Also on the live site: rescanning the same test receipt showed **"You already scanned this receipt"**; guests +
+lock matched hand math again; card roulette — both opted in, Hana spun, **Hana lost**: both phones showed "Hana
+covers $22.89 for 2 people", Felix $0.00 ("covered by Hana"), guest Gina unaffected at $7.63, shares still $30.52;
+a **second spin was refused** ("This bill already had its spin"); **deleteBill** removed the bill (public preview
+→ 404). The first run stopped at the reveal because the test looked for "covers" while the loser's own screen says
+"You cover" — a test bug, fixed.

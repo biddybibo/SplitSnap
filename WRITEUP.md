@@ -24,16 +24,17 @@ shared items and "by how many" splits → lock → settle with Venmo / Cash App 
 | **Split "by how many"** (2 of the 3 tacos). | The agent recommended deferring it as out of scope; I chose to build it, because shared plates are exactly where even splits feel unfair. |
 | **A limited public preview** before sign-in. | A friend tapping a link should see who invited them, the restaurant and total, and who's already picking — not a bare sign-in wall. It shows no ids, emails, per-person amounts or pay handles. |
 | **The host can assign items for others** ("who had the Jarritos?"). | Through one host-only server action; everyone else can still only claim for themselves. |
-| **No gambling.** "Card roulette" stays a lighthearted pick of who covers the bill. | Wagering beyond the bill is regulated gambling and not the product. |
+| **No gambling.** Card roulette is a lighthearted pick of who covers the bill: everyone opts in on their own phone, the server draws once with secure randomness, and nobody can re-roll or rig it. | Wagering beyond the bill is regulated gambling and not the product. |
+| **Catch duplicate scans without wasting one.** | The AI has to read a receipt before it can recognise it, so the bill is always created and the host chooses "open the earlier one" (the copy is deleted) or "keep both". Matching uses the printed check number and date first, then date-time and total, then the line prices. |
 
 ## Proving it's safe
 
 Permissions live in the server, not the UI. I tested them the way an attacker would: a script that opens its own
 connection to a bill's room and sends forged writes, and calls server actions directly, as a friend and as the
-host, on the live site. **21 of 21 attacks were refused** — forging a claim as someone else, claiming twice, a
+host, on the live site. **26 of 26 attacks were refused** — forging a claim as someone else, claiming twice, a
 friend changing prices or adding a fake discount, writing your own final share, locking by hand (even as the host),
-marking someone else paid, calling host-only actions, reading the AI-usage table, and checking the public preview
-for leaks. The full table with the server's exact answers is in `tests/break-it.md`.
+marking someone else paid, calling host-only actions, rigging card roulette, reading the AI-usage table, and
+checking the public preview for leaks. The full table with the server's exact answers is in `tests/break-it.md`.
 
 The money math is one pure function used both in the live preview and on the server at lock. Its tests include a
 2,000-bill randomized check that shares always add up to the bill exactly, and an end-to-end run on the live site
@@ -96,8 +97,8 @@ the join screen only polls while visible, and the QR library loads only when the
   buyer with a budget.
 - **Pay at the table, for restaurants** — the QR on the receipt, diners pay the restaurant directly. The biggest
   opportunity, but it needs payment processing and point-of-sale integrations.
-- **Smaller:** duplicate-receipt detection (the check number and timestamp are already captured), a "claim your
-  spot" link that turns a guest into a signed-in friend, and card roulette.
+- **Smaller:** a "claim your spot" link that turns a guest into a signed-in friend, email reminders for unpaid
+  friends, and invite tracking ("1 link · not opened").
 
 ## Known limitations
 

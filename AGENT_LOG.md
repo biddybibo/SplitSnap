@@ -165,3 +165,15 @@ says that too. **Verified** lines are my own notes from testing.
   (decisions and trade-offs, break-it results, how I worked with the agent, DeepSpace notes, scaling, what's next,
   known limitations), with placeholders where only I can fill in.
 - **Verified:** _[your notes]_
+
+## 2026-10-04 — Extra features: duplicates, delete, card roulette, done picking
+- **Direction:** asked what was left with spare time; chose the agent's recommended set (duplicate detection +
+  delete, card roulette, "I'm done picking"), keeping work-meal mode for the writeup. Card roulette within the
+  line I set earlier: lighthearted, no stakes beyond the bill.
+- **Agent built:** duplicate rules (`src/lib/duplicates.ts`, tests) — the bill is always created so no scan is
+  wasted, then "open the earlier bill" or "keep both"; host-only `deleteBill` + Edit mode on Your bills. Card
+  roulette: own opt-ins, host spins once after lock, server crypto draw (even or weighted), live reveal on every
+  phone, Settle amounts follow the result. "I'm done picking" → Done on the host view.
+- **Tested live:** duplicate prompt on a rescan; 26/26 attacks refused (incl. rigging roulette); roulette e2e
+  (Hana lost: both phones agree, Felix $0, guest unaffected, re-spin refused); delete → 404. 104 unit tests.
+- **Verified:** _[your notes]_

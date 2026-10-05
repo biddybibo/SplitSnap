@@ -24,6 +24,10 @@ You need two phones (or a phone and a laptop) and a Google or GitHub account on 
    The host can add guests who won't sign in and pick for them.
 5. **Lock:** the host locks once everything is claimed and adds up. Everyone sees what they owe, taps a pay
    button (the amount is filled in), and marks themselves paid.
+6. **Optional — card roulette:** everyone who taps "I'm in" puts their share in, the host spins, and every phone
+   watches the same reveal of who covers it all. Just for fun; one spin per bill.
+
+Scanning the same receipt twice is caught ("You already scanned this receipt"), and the host can delete bills.
 
 SplitSnap never moves money; the pay buttons hand off to the payment app.
 
@@ -36,7 +40,8 @@ Phone browser (React + Vite)
   │                                                 guests, guestClaims, shares (+ presence)
   └─ HTTPS ─────────────► Worker (Hono on Cloudflare)
                             ├─ server actions: parseReceipt, joinBill, addItem, assignItem,
-                            │   addGuest, removeGuest, setGuestPaid, lockBill, scansLeft
+                            │   addGuest, removeGuest, setGuestPaid, lockBill, spinRoulette,
+                            │   deleteBill, scansLeft
                             ├─ GET /api/public/bills/:id  (read-only join preview)
                             └─ platform proxy → auth, private file storage, Claude
 ```
@@ -60,16 +65,16 @@ verified user on every claim), once per item; only the host edits prices; only s
 or lock a bill; the AI-usage table is invisible to everyone.
 
 These were attacked directly — forged writes over a raw room connection and direct action calls, the way a
-script would, not through the app's buttons — on the live site: **21 / 21 attacks refused.** Results and what each
+script would, not through the app's buttons — on the live site: **26 / 26 attacks refused.** Results and what each
 check proves: [tests/break-it.md](tests/break-it.md). Rerun with `node tests/break-it.run.mjs`.
 
 ## Tests
 
 | What | How | Result |
 |---|---|---|
-| Money math, reconcile, claims, pay links, dates, inputs | `npm run test:unit` (Vitest) | 87 tests, incl. a 2,000-bill randomized check that shares always sum exactly |
+| Money math, reconcile, claims, roulette, duplicates, pay links, dates, inputs | `npm run test:unit` (Vitest) | 104 tests, incl. a 2,000-bill randomized check that shares always sum exactly |
 | App boots, routes, auth wiring | `npx deepspace test run` (Playwright) | 8 tests |
-| Security + full flow on the live site | `node tests/break-it.run.mjs` | 21/21 attacks refused; guests + lock match hand math to the cent |
+| Security + full flow on the live site | `node tests/break-it.run.mjs` | 26/26 attacks refused; guests, lock and roulette match hand math to the cent |
 
 ## Run it locally
 

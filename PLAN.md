@@ -20,7 +20,8 @@ date + check number, then date/time + total, then total + line prices within 7 d
 receipt — open it / start new anyway") and host-only bill deletion; email nudges to unpaid people, a daily reminder job,
 a "who's still picking" indicator.
 
-**Stretch, after the core path works (in this order):**
+**Stretch, after the core path works (in this order):** _(built 2026-10-04: card roulette, duplicate detection +
+delete, "I'm done picking"; work-meal mode left for the writeup)_
 1. *Card roulette* — a lighthearted game to pick who covers the whole bill. Everyone opts in on their own phone; the
    host starts the draw; a server action picks with secure randomness and saves the result where no one can edit it;
    every phone sees the reveal live. Optional "weighted by what you ordered" mode. The loser owes the host the bill
