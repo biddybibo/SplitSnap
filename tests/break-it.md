@@ -253,3 +253,10 @@ covers $22.89 for 2 people", Felix $0.00 ("covered by Hana"), guest Gina unaffec
 a **second spin was refused** ("This bill already had its spin"); **deleteBill** removed the bill (public preview
 → 404). The first run stopped at the reveal because the test looked for "covers" while the loser's own screen says
 "You cover" — a test bug, fixed.
+
+### After reminders (bill d76b3c46…)
+
+**27 / 27 attacks refused**, adding `18. Send reminder emails` → `Only the host can send reminders`. Reminders end to
+end: Hana's `remindUnpaid` emailed Felix (reply `{"name":"Felix","result":"sent"}`, no email address anywhere in
+it); an immediate second call returned `reminded recently` (6-hour limit). Roulette this run: **Felix lost** and owed
+$22.89 ($6.54 + Hana's $16.35); guest Gina unaffected at $7.63; re-spin refused; deleteBill → 404.

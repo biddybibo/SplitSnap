@@ -177,3 +177,15 @@ says that too. **Verified** lines are my own notes from testing.
 - **Tested live:** duplicate prompt on a rescan; 26/26 attacks refused (incl. rigging roulette); roulette e2e
   (Hana lost: both phones agree, Felix $0, guest unaffected, re-spin refused); delete → 404. 104 unit tests.
 - **Verified:** _[your notes]_
+
+## 2026-10-05 — Reminders by text and email
+- **Direction:** one more feature on deadline day; **I asked for text reminders as well as email**.
+- **Decided:** texts go from my own phone (no SMS provider exists on the platform, and server-sent SMS needs
+  carrier registration); email goes from SplitSnap.
+- **Agent built:** found the real integration (`email/send`, not the documented `resend/send-email`) and the
+  accepted sender (`noreply@app.space`; the app's own subdomain was refused) with three test sends to the test
+  account (~$0.04); host-only `remindUnpaid` (server-side emails, never returned; 6-hour limit); Settle: "Text the
+  group", per-person Text / Email, "emailed 2h ago".
+- **Tested live:** 27/27 attacks refused; Felix emailed, reply had no address, second try throttled; roulette and
+  delete re-verified. 108 unit tests.
+- **Verified:** _[your notes]_

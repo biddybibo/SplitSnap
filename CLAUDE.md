@@ -73,7 +73,10 @@ Full spec: `PLAN.md`. Read it before starting any new slice of work.
 - "Share anyway, the host covers the difference": a `hostAdjustment` line charged to the host alone (not split
   by subtotal). It reconciles the bill; friends pay only for what's on the lines.
 - AI flags uncertain lines (`flagged`, `flagNote` on items); editing the price clears the flag.
-- `nudgeUnpaid` (stretch): host-only, emails unpaid participants via `resend/send-email`. Emails never returned to client.
+- `remindUnpaid` (built as the "nudge"): host-only, after lock; emails people who still owe via the `email/send`
+  integration (not `resend/send-email`, which the docs still show) from `SplitSnap <noreply@app.space>` — the app's
+  own subdomain isn't a verified sender. Emails are read server-side only and never returned; one email per person
+  per 6 h (`reminders` collection). Text reminders are `sms:` links from the host's own phone (no numbers stored).
 
 ## Permissions (must hold server-side, not just in UI)
 - `items`: `ownerField: hostId` (userBound) — only the host edits/deletes; create false (actions only).

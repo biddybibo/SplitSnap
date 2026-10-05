@@ -25,13 +25,14 @@ shared items and "by how many" splits → lock → settle with Venmo / Cash App 
 | **A limited public preview** before sign-in. | A friend tapping a link should see who invited them, the restaurant and total, and who's already picking — not a bare sign-in wall. It shows no ids, emails, per-person amounts or pay handles. |
 | **The host can assign items for others** ("who had the Jarritos?"). | Through one host-only server action; everyone else can still only claim for themselves. |
 | **No gambling.** Card roulette is a lighthearted pick of who covers the bill: everyone opts in on their own phone, the server draws once with secure randomness, and nobody can re-roll or rig it. | Wagering beyond the bill is regulated gambling and not the product. |
+| **Reminders by text from the host's phone, and by email from SplitSnap.** | A nudge from a friend in the group chat lands better than an automated message, needs no SMS provider (which would also need carrier registration) and stores no phone numbers. Email covers everyone else: host-only, read server-side, never shown to anyone, at most once per person every 6 hours. |
 | **Catch duplicate scans without wasting one.** | The AI has to read a receipt before it can recognise it, so the bill is always created and the host chooses "open the earlier one" (the copy is deleted) or "keep both". Matching uses the printed check number and date first, then date-time and total, then the line prices. |
 
 ## Proving it's safe
 
 Permissions live in the server, not the UI. I tested them the way an attacker would: a script that opens its own
 connection to a bill's room and sends forged writes, and calls server actions directly, as a friend and as the
-host, on the live site. **26 of 26 attacks were refused** — forging a claim as someone else, claiming twice, a
+host, on the live site. **27 of 27 attacks were refused** — forging a claim as someone else, claiming twice, a
 friend changing prices or adding a fake discount, writing your own final share, locking by hand (even as the host),
 marking someone else paid, calling host-only actions, rigging card roulette, reading the AI-usage table, and
 checking the public preview for leaks. The full table with the server's exact answers is in `tests/break-it.md`.
@@ -97,8 +98,8 @@ the join screen only polls while visible, and the QR library loads only when the
   buyer with a budget.
 - **Pay at the table, for restaurants** — the QR on the receipt, diners pay the restaurant directly. The biggest
   opportunity, but it needs payment processing and point-of-sale integrations.
-- **Smaller:** a "claim your spot" link that turns a guest into a signed-in friend, email reminders for unpaid
-  friends, and invite tracking ("1 link · not opened").
+- **Smaller:** a "claim your spot" link that turns a guest into a signed-in friend, a daily reminder for bills
+  still unpaid after a day, and invite tracking ("1 link · not opened").
 
 ## Known limitations
 
