@@ -7,6 +7,7 @@
 
 import { useEffect } from 'react'
 import { useAsyncResource } from 'deepspace'
+import { parsePrintedAt, shortDay } from '@/lib/dates'
 import { formatCents } from '@/lib/money'
 import { AVATAR_COLORS } from '@/lib/people'
 import { rememberReturnPath } from '@/lib/returnTo'
@@ -21,13 +22,6 @@ interface Preview {
   itemCount: number
   items: { name: string; priceCents: number; claimers: { name: string; color: number }[] }[]
   pickers: string[]
-}
-
-function when(printedAt: string | null): string {
-  if (!printedAt) return ''
-  const d = new Date(printedAt.length === 10 ? `${printedAt}T00:00` : printedAt)
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toDateString() === new Date().toDateString() ? 'Today' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 function Initial({ name, color, size }: { name: string; color: number; size: number }) {
@@ -54,11 +48,18 @@ export function JoinPreview({ billId, path }: { billId: string; path: string }) 
     { retry: 1 },
   )
 
-  // Keep "who's picking" live while the friend decides.
+  // Keep "who's picking" live while the friend decides — but only while they're looking at it.
   const { reload } = preview
   useEffect(() => {
-    const t = setInterval(reload, 8000)
-    return () => clearInterval(t)
+    const t = setInterval(() => {
+      if (document.visibilityState === 'visible') reload()
+    }, 8000)
+    const onVisible = () => document.visibilityState === 'visible' && reload()
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(t)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [reload])
 
   function signIn(provider: 'google' | 'github') {
@@ -87,7 +88,7 @@ export function JoinPreview({ billId, path }: { billId: string; path: string }) 
             </span>
             <h1 className="font-display text-[32px] font-semibold leading-tight tracking-tight">{p.merchant}</h1>
             <span className="text-sm text-muted-foreground">
-              {[when(p.printedAt), `${p.itemCount} ${p.itemCount === 1 ? 'item' : 'items'}`].filter(Boolean).join(' · ')} ·{' '}
+              {[shortDay(parsePrintedAt(p.printedAt)), `${p.itemCount} ${p.itemCount === 1 ? 'item' : 'items'}`].filter(Boolean).join(' · ')} ·{' '}
               <span className="font-mono text-foreground">{formatCents(p.totalCents)}</span> total
             </span>
           </div>

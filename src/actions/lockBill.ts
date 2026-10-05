@@ -11,10 +11,9 @@
 import type { ActionHandler } from 'deepspace/worker'
 import { computeShares, type ShareClaim, type ShareLine } from '../lib/computeShares'
 import { reconcile, type LineKind } from '../lib/reconcile'
-import { createActionTools } from '../server/action-tools'
+import { requireHost } from '../server/bill-access'
 import type { Env } from '../../worker'
 
-type BillRow = { hostId: string; status: string }
 type ItemRow = { kind: LineKind; priceCents: number; qty?: number; name?: string }
 type ClaimRow = { itemId: string; userId: string; units?: number | null }
 type GuestClaimRow = { itemId: string; guestId: string; units?: number | null }
@@ -28,17 +27,13 @@ type ReceiptRow = {
 
 const ALL = { limit: 1000 }
 
-export const lockBill: ActionHandler<Env> = async ({ userId, params, tools, env, callerJwt }) => {
-  const { billId } = params
-  if (typeof billId !== 'string' || !/^[0-9a-f-]{36}$/.test(billId)) {
-    return { success: false, error: 'Invalid bill' }
-  }
+export const lockBill: ActionHandler<Env> = async (ctx) => {
+  const { userId, tools } = ctx
+  const host = await requireHost(ctx, ctx.params.billId, { action: 'lock the bill', allowLocked: true })
+  if (!host.ok) return { success: false, error: host.error }
+  if (host.lockedAt) return { success: false, error: 'This bill is already locked' }
+  const { billId, room: billTools } = host
 
-  const bill = await tools.get<BillRow>('bills', billId)
-  if (!bill.success) return { success: false, error: 'Bill not found' }
-  if (bill.data.record.data.hostId !== userId) return { success: false, error: 'Only the host can lock the bill' }
-
-  const billTools = createActionTools(env, userId, callerJwt, `bill:${billId}`)
   const [receipt, items, claims, guestClaims] = await Promise.all([
     billTools.get<ReceiptRow>('receipt', 'receipt'),
     billTools.query<ItemRow>('items', ALL),
@@ -48,7 +43,6 @@ export const lockBill: ActionHandler<Env> = async ({ userId, params, tools, env,
   if (!receipt.success || !items.success || !claims.success || !guestClaims.success) {
     return { success: false, error: 'Could not read the bill; try again' }
   }
-  if (receipt.data.record.data.lockedAt) return { success: false, error: 'This bill is already locked' }
 
   const lines: ShareLine[] = items.data.records.map((r) => ({
     id: r.recordId,

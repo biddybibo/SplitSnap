@@ -14,8 +14,10 @@ import { useAsyncResource, useAuth, useDisplayName, useMutations, useQuery, useR
 import { AlertTriangle, Check, ChevronDown, ChevronLeft, Plus, Trash2 } from 'lucide-react'
 import { Button, useToast } from '@/components/ui'
 import { callAction } from '@/lib/actions'
+import { receiptStamp } from '@/lib/dates'
 import { formatCents, parseDollars } from '@/lib/money'
-import { reconcile, tipForPercent, type LineKind } from '@/lib/reconcile'
+import { billMath } from '@/lib/billMath'
+import { tipForPercent, type LineKind } from '@/lib/reconcile'
 import { cn } from '@/lib/utils'
 import { HandleField, MoneyField, TextField } from './fields'
 import type { Participant } from './Table'
@@ -40,6 +42,9 @@ export function ReviewScreen({ billId }: { billId: string }) {
   const [photoOpen, setPhotoOpen] = useState(false)
   // Remembers a mismatch seen during this visit, so fixing it turns the banner green instead of hiding it.
   const sawMismatch = useRef(false)
+  // One download for both the thumbnail and the full view. It's the host's private file, so only the host asks.
+  const photoRow = receiptQuery.records[0]?.data
+  const photo = useReceiptPhoto(photoRow && photoRow.hostId === userId ? photoRow.imageId || undefined : undefined)
 
   if (receiptQuery.status === 'loading' || itemsQuery.status === 'loading') {
     return <p className="px-5 py-10 text-center text-muted-foreground">Loading the bill…</p>
@@ -56,15 +61,8 @@ export function ReviewScreen({ billId }: { billId: string }) {
   const isHost = receipt.hostId === userId
   const canEdit = isHost && itemMutations.ready && receiptMutations.ready
   const items = itemsQuery.records
-  const check = reconcile(
-    items.map((i) => ({ kind: i.data.kind, priceCents: i.data.priceCents })),
-    {
-      printedSubtotalCents: receipt.printedSubtotalCents ?? null,
-      printedTotalCents: receipt.printedTotalCents,
-      printedTipCents: receipt.printedTipCents ?? 0,
-      chargedCents: receipt.chargedCents ?? null,
-    },
-  )
+  // The review screen has no claims yet; it only needs the reconcile check.
+  const { check } = billMath(items, receipt, [])
 
   const claimable = items.filter((i) => i.data.kind === 'item' || i.data.kind === 'discount')
   const charges = items.filter((i) => ['fee', 'tax', 'adjustment'].includes(i.data.kind))
@@ -158,7 +156,7 @@ export function ReviewScreen({ billId }: { billId: string }) {
       {/* Summary: photo, restaurant, and whether the numbers add up. */}
       <section className={cn(card, 'flex items-center gap-3 p-2.5')}>
         {isHost && receipt.imageId ? (
-          <PhotoThumb imageId={receipt.imageId} open={photoOpen} onToggle={() => setPhotoOpen((o) => !o)} />
+          <PhotoThumb photo={photo} open={photoOpen} onToggle={() => setPhotoOpen((o) => !o)} />
         ) : (
           <span className="flex h-[68px] w-[52px] shrink-0 items-center justify-center rounded-md bg-muted text-center text-[10px] text-muted-foreground">
             Receipt
@@ -190,7 +188,7 @@ export function ReviewScreen({ billId }: { billId: string }) {
           )}
         </div>
       </section>
-      {photoOpen && receipt.imageId && <PhotoFull imageId={receipt.imageId} onClose={() => setPhotoOpen(false)} />}
+      {photoOpen && receipt.imageId && <PhotoFull photo={photo} onClose={() => setPhotoOpen(false)} />}
 
 
 
@@ -373,36 +371,24 @@ export function ReviewScreen({ billId }: { billId: string }) {
 
 function ReceiptMeta({ printedAt, receiptNumber }: { printedAt?: string; receiptNumber?: string }) {
   const parts: string[] = []
-  if (printedAt) {
-    // Date-only strings parse as UTC midnight (the previous day in the US); pin them to local time.
-    const d = new Date(printedAt.length === 10 ? `${printedAt}T00:00` : printedAt)
-    if (!Number.isNaN(d.getTime())) {
-      parts.push(
-        d.toLocaleString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-          ...(printedAt.length > 10 ? { hour: 'numeric', minute: '2-digit' } : {}),
-        }),
-      )
-    }
-  }
+  const stamp = receiptStamp(printedAt)
+  if (stamp) parts.push(stamp)
   if (receiptNumber) parts.push(`Check ${receiptNumber}`)
   if (parts.length === 0) return null
   return <span className="truncate text-[13px] text-muted-foreground">{parts.join(' · ')}</span>
 }
 
 /** Private (`self` scope) photo: it needs the auth header, so it can't be a plain <img src>. */
-function useReceiptPhoto(imageId: string) {
+function useReceiptPhoto(imageId: string | undefined) {
   const { readFile } = useR2Files()
   const photo = useAsyncResource(
     async () => {
-      const res = await readFile(imageId)
+      const res = await readFile(imageId!)
       if (!res.ok) throw new Error(`Photo unavailable (HTTP ${res.status})`)
       return URL.createObjectURL(await res.blob())
     },
     [imageId],
-    { retry: 1 },
+    { retry: 1, enabled: Boolean(imageId) },
   )
   useEffect(() => {
     const url = photo.data
@@ -413,8 +399,9 @@ function useReceiptPhoto(imageId: string) {
   return photo
 }
 
-function PhotoThumb({ imageId, open, onToggle }: { imageId: string; open: boolean; onToggle: () => void }) {
-  const photo = useReceiptPhoto(imageId)
+type ReceiptPhoto = ReturnType<typeof useReceiptPhoto>
+
+function PhotoThumb({ photo, open, onToggle }: { photo: ReceiptPhoto; open: boolean; onToggle: () => void }) {
   return (
     <button
       type="button"
@@ -432,8 +419,7 @@ function PhotoThumb({ imageId, open, onToggle }: { imageId: string; open: boolea
   )
 }
 
-function PhotoFull({ imageId, onClose }: { imageId: string; onClose: () => void }) {
-  const photo = useReceiptPhoto(imageId)
+function PhotoFull({ photo, onClose }: { photo: ReceiptPhoto; onClose: () => void }) {
   if (photo.status === 'error') {
     return (
       <p className={cn(card, 'flex items-center justify-between px-4 py-3 text-sm text-muted-foreground')}>

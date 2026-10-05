@@ -5,9 +5,11 @@
  * can never become an open redirect.
  */
 
+import { BILL_ID_PATTERN } from '../shared/ids'
+
 const KEY = 'splitsnap:returnTo'
 const MAX_AGE_MS = 10 * 60 * 1000
-const BILL_PATH = /^\/b\/[0-9a-f-]{36}$/
+const BILL_PATH = new RegExp(`^/b/${BILL_ID_PATTERN}$`)
 
 export function rememberReturnPath(path: string): void {
   if (!BILL_PATH.test(path)) return

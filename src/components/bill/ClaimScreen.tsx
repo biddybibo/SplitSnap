@@ -8,22 +8,23 @@
  * (uniqueOn), so the UI can't claim for anyone else even if it tried.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth, useMutations, usePresenceRoom, useQuery } from 'deepspace'
 import { Pencil, SplitSquareHorizontal } from 'lucide-react'
 import { Button, ConfirmModal, buttonVariants, useToast } from '@/components/ui'
 import { callAction } from '@/lib/actions'
-import { claimsByLine, unclaimedCount } from '@/lib/claims'
-import { computeShares } from '@/lib/computeShares'
+import { billMath } from '@/lib/billMath'
+import { unclaimedCount } from '@/lib/claims'
 import { formatCents } from '@/lib/money'
-import { reconcile } from '@/lib/reconcile'
 import { cn } from '@/lib/utils'
 import { HostPanel } from './HostPanel'
-import { InviteSheet } from './InviteSheet'
 import { SplitSheet } from './SplitSheet'
 import { Avatar, AvatarStack, JoinCard } from './Table'
 import { useTable } from './useTable'
+
+// The invite sheet carries the QR library; load it only when someone opens it.
+const InviteSheet = lazy(() => import('./InviteSheet').then((m) => ({ default: m.InviteSheet })))
 import type { Item, ReceiptRow } from './types'
 
 export function ClaimScreen({ billId }: { billId: string }) {
@@ -64,15 +65,11 @@ export function ClaimScreen({ billId }: { billId: string }) {
   const hostName = people.find((p) => p.userId === receipt.hostId)?.displayName ?? 'the host'
   const canClaim = Boolean(me) && claimMutations.ready
 
-  const lines = itemsQuery.records
-    .filter((i) => i.data.kind === 'item' || i.data.kind === 'discount')
-    .map((i) => ({ id: i.recordId, priceCents: i.data.priceCents, name: i.data.name, qty: Math.max(1, i.data.qty ?? 1) }))
   const claims = table.claims
-  const byLine = claimsByLine(lines, claims.map((c) => c.data))
-  const shares = computeShares(
-    itemsQuery.records.map((i) => ({ id: i.recordId, kind: i.data.kind, priceCents: i.data.priceCents })),
-    claims.map((c) => ({ itemId: c.data.itemId, userId: c.data.userId, units: c.data.units ?? null })),
-    receipt.hostId,
+  const { check: billCheck, claimable: lines, byLine, shares } = billMath(
+    itemsQuery.records,
+    receipt,
+    claims.map((c) => c.data),
   )
   const myShare = shares.find((s) => s.userId === userId)
   const breakdown = [
@@ -83,15 +80,6 @@ export function ClaimScreen({ billId }: { billId: string }) {
     ...(myShare?.adjustmentCents ? [`${formatCents(myShare.adjustmentCents)} adj.`] : []),
   ].join(' + ')
   const unclaimed = unclaimedCount(lines, byLine)
-  const billCheck = reconcile(
-    itemsQuery.records.map((i) => ({ kind: i.data.kind, priceCents: i.data.priceCents })),
-    {
-      printedSubtotalCents: receipt.printedSubtotalCents ?? null,
-      printedTotalCents: receipt.printedTotalCents,
-      printedTipCents: receipt.printedTipCents ?? 0,
-      chargedCents: receipt.chargedCents ?? null,
-    },
-  )
   const billTotalCents = billCheck.grandTotalCents
   // "By how many" lines that don't have every unit assigned yet block the lock (lockBill checks the same).
   const partlySplit = lines.filter((l) => {
@@ -340,6 +328,7 @@ export function ClaimScreen({ billId }: { billId: string }) {
       )}
 
       {inviteOpen && (
+        <Suspense fallback={null}>
         <InviteSheet
           billId={billId}
           merchant={receipt.merchant}
@@ -351,6 +340,7 @@ export function ClaimScreen({ billId }: { billId: string }) {
           isHost={isHost}
           onClose={closeInvite}
         />
+        </Suspense>
       )}
     </div>
   )

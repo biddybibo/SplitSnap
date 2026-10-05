@@ -13,15 +13,15 @@
 
 import type { ActionHandler } from 'deepspace/worker'
 import { createActionTools } from '../server/action-tools'
+import { requireHost } from '../server/bill-access'
 import type { Env } from '../../worker'
 
-type BillRow = { hostId: string }
 type ItemRow = { kind: string; qty?: number }
 type Assignment = { userId: string; units?: number }
 
-export const assignItem: ActionHandler<Env> = async ({ userId, params, tools, env, callerJwt }) => {
+export const assignItem: ActionHandler<Env> = async (ctx) => {
+  const { userId, params, env, callerJwt } = ctx
   const { billId, itemId, assignments } = params
-  if (typeof billId !== 'string' || !/^[0-9a-f-]{36}$/.test(billId)) return { success: false, error: 'Invalid bill' }
   if (typeof itemId !== 'string' || itemId.length > 100) return { success: false, error: 'Invalid item' }
   if (!Array.isArray(assignments) || assignments.length > 50) return { success: false, error: 'Invalid assignments' }
 
@@ -37,19 +37,15 @@ export const assignItem: ActionHandler<Env> = async ({ userId, params, tools, en
     list.push({ userId: who, units: units as number | undefined })
   }
 
-  const bill = await tools.get<BillRow>('bills', billId)
-  if (!bill.success) return { success: false, error: 'Bill not found' }
-  if (bill.data.record.data.hostId !== userId) return { success: false, error: 'Only the host can assign items' }
-
-  const asHost = createActionTools(env, userId, callerJwt, `bill:${billId}`)
-  const [receipt, item, seats, guests] = await Promise.all([
-    asHost.get<{ lockedAt?: string }>('receipt', 'receipt'),
+  const host = await requireHost(ctx, billId, { action: 'assign items' })
+  if (!host.ok) return { success: false, error: host.error }
+  const asHost = host.room
+  const [item, seats, guests] = await Promise.all([
     asHost.get<ItemRow>('items', itemId),
     asHost.query<{ userId: string }>('participants', { limit: 500 }),
     asHost.query('guests', { limit: 500 }),
   ])
-  if (!receipt.success || !seats.success || !guests.success) return { success: false, error: 'Could not read the bill; try again' }
-  if (receipt.data.record.data.lockedAt) return { success: false, error: 'This bill is locked' }
+  if (!seats.success || !guests.success) return { success: false, error: 'Could not read the bill; try again' }
   if (!item.success) return { success: false, error: 'Item not found' }
   const kind = item.data.record.data.kind
   if (kind !== 'item' && kind !== 'discount') return { success: false, error: 'Only items can be assigned' }
@@ -82,10 +78,10 @@ export const assignItem: ActionHandler<Env> = async ({ userId, params, tools, en
       continue
     }
     // Acting as the target: claims.userId is userBound, so the room stamps *their* id on the row.
-    const asThem = createActionTools(env, a.userId, callerJwt, `bill:${billId}`)
+    const asThem = createActionTools(env, a.userId, callerJwt, `bill:${host.billId}`)
     const made = await asThem.create('claims', { itemId, units: a.units ?? null })
     if (!made.success) return { success: false, error: 'Could not save every claim; try again' }
   }
-  console.info(`[assignItem] host=${userId} bill=${billId} item=${itemId} people=${list.length}`)
+  console.info(`[assignItem] host=${userId} bill=${host.billId} item=${itemId} people=${list.length}`)
   return { success: true, data: { assigned: list.length } }
 }

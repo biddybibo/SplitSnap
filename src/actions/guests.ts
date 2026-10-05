@@ -5,38 +5,16 @@
  * In shares and computeShares a guest is `guest:<guestId>`.
  */
 
-import type { ActionHandler, ActionTools } from 'deepspace/worker'
-import { createActionTools } from '../server/action-tools'
+import type { ActionHandler } from 'deepspace/worker'
+import { requireHost } from '../server/bill-access'
 import type { Env } from '../../worker'
 
 const MAX_GUESTS = 20
 
-/** Verifies the caller hosts an unlocked bill; returns the bill room's tools. */
-async function hostRoom(
-  tools: ActionTools,
-  env: Env,
-  userId: string,
-  callerJwt: string,
-  billId: unknown,
-  { allowLocked = false } = {},
-): Promise<{ ok: true; room: ActionTools } | { ok: false; error: string }> {
-  if (typeof billId !== 'string' || !/^[0-9a-f-]{36}$/.test(billId)) return { ok: false, error: 'Invalid bill' }
-  const bill = await tools.get<{ hostId: string }>('bills', billId)
-  if (!bill.success) return { ok: false, error: 'Bill not found' }
-  if (bill.data.record.data.hostId !== userId) return { ok: false, error: 'Only the host can manage guests' }
-  const room = createActionTools(env, userId, callerJwt, `bill:${billId}`)
-  if (!allowLocked) {
-    const receipt = await room.get<{ lockedAt?: string }>('receipt', 'receipt')
-    if (!receipt.success) return { ok: false, error: 'Could not read the bill; try again' }
-    if (receipt.data.record.data.lockedAt) return { ok: false, error: 'This bill is locked' }
-  }
-  return { ok: true, room }
-}
-
-export const addGuest: ActionHandler<Env> = async ({ userId, params, tools, env, callerJwt }) => {
-  const name = typeof params.displayName === 'string' ? params.displayName.trim() : ''
+export const addGuest: ActionHandler<Env> = async (ctx) => {
+  const name = typeof ctx.params.displayName === 'string' ? ctx.params.displayName.trim() : ''
   if (name.length === 0 || name.length > 40) return { success: false, error: 'Name must be 1–40 characters' }
-  const host = await hostRoom(tools, env, userId, callerJwt, params.billId)
+  const host = await requireHost(ctx, ctx.params.billId, { action: 'manage guests' })
   if (!host.ok) return { success: false, error: host.error }
   const existing = await host.room.query('guests', { limit: MAX_GUESTS + 1 })
   if (!existing.success) return { success: false, error: 'Could not add the guest; try again' }
@@ -46,10 +24,10 @@ export const addGuest: ActionHandler<Env> = async ({ userId, params, tools, env,
   return { success: true, data: { guestId: made.data.recordId } }
 }
 
-export const removeGuest: ActionHandler<Env> = async ({ userId, params, tools, env, callerJwt }) => {
-  const { guestId } = params
+export const removeGuest: ActionHandler<Env> = async (ctx) => {
+  const { guestId } = ctx.params
   if (typeof guestId !== 'string' || guestId.length > 100) return { success: false, error: 'Invalid guest' }
-  const host = await hostRoom(tools, env, userId, callerJwt, params.billId)
+  const host = await requireHost(ctx, ctx.params.billId, { action: 'manage guests' })
   if (!host.ok) return { success: false, error: host.error }
   // Their picks first, so an item never points at a guest who no longer exists.
   for (;;) {
@@ -63,11 +41,11 @@ export const removeGuest: ActionHandler<Env> = async ({ userId, params, tools, e
 }
 
 /** Guests can't tap "I paid" themselves, so the host records it — also after the bill is locked. */
-export const setGuestPaid: ActionHandler<Env> = async ({ userId, params, tools, env, callerJwt }) => {
-  const { guestId, paid } = params
+export const setGuestPaid: ActionHandler<Env> = async (ctx) => {
+  const { guestId, paid } = ctx.params
   if (typeof guestId !== 'string' || guestId.length > 100) return { success: false, error: 'Invalid guest' }
   if (typeof paid !== 'boolean') return { success: false, error: 'paid must be true or false' }
-  const host = await hostRoom(tools, env, userId, callerJwt, params.billId, { allowLocked: true })
+  const host = await requireHost(ctx, ctx.params.billId, { action: 'manage guests', allowLocked: true })
   if (!host.ok) return { success: false, error: host.error }
   const guest = await host.room.get('guests', guestId)
   if (!guest.success) return { success: false, error: 'Guest not found' }

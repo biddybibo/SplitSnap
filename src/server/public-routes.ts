@@ -7,10 +7,16 @@
  */
 
 import type { Hono } from 'hono'
+import { avatarIndex } from '../shared/avatar.js'
+import { isBillId } from '../shared/ids.js'
 import type { AppContext, Env } from '../../worker.js'
 
-const BILL_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const SHOWN_ITEMS = 4
+// Everyone staring at a shared link polls this every few seconds; answer repeats from memory for a moment
+// instead of doing four room reads each time. Per-isolate and tiny, so no eviction policy beyond a size cap.
+const CACHE_MS = 5000
+const CACHE_MAX = 500
+const cache = new Map<string, { at: number; body: unknown }>()
 
 interface Envelope<T> {
   recordId: string
@@ -33,7 +39,12 @@ async function readRoom<T>(env: Env, roomId: string, tool: string, params: Recor
 export function registerPublicRoutes(app: Hono<AppContext>): void {
   app.get('/api/public/bills/:id', async (c) => {
     const id = c.req.param('id')
-    if (!BILL_ID.test(id)) return c.json({ error: 'Not found' }, 404)
+    if (!isBillId(id)) return c.json({ error: 'Not found' }, 404)
+    const hit = cache.get(id)
+    if (hit && Date.now() - hit.at < CACHE_MS) {
+      c.header('Cache-Control', 'no-store')
+      return c.json(hit.body)
+    }
     const room = `bill:${id}`
     const [receipt, items, claims, people] = await Promise.all([
       readRoom<{ record: Envelope<{ merchant?: string; hostId?: string; printedAt?: string; lockedAt?: string }> }>(
@@ -57,11 +68,7 @@ export function registerPublicRoutes(app: Hono<AppContext>): void {
     const firstName = (n: string) => n.trim().split(/\s+/)[0]?.slice(0, 20) || 'Someone'
     const nameOf = new Map(seated.map((p) => [p.data.userId, firstName(p.data.displayName)]))
     // Avatars are colored by a hash of the user id on every screen; send that index, never the id itself.
-    const colorOf = (uid: string) => {
-      let h = 0
-      for (let i = 0; i < uid.length; i++) h = (h * 31 + uid.charCodeAt(i)) >>> 0
-      return h % 6
-    }
+    const colorOf = avatarIndex
     const claimable = lines.filter((l) => l.data.kind === 'item' || l.data.kind === 'discount')
     const claimers = (itemId: string) =>
       (claims?.records ?? [])
@@ -71,8 +78,7 @@ export function registerPublicRoutes(app: Hono<AppContext>): void {
       .map((uid) => nameOf.get(uid))
       .filter((n): n is string => Boolean(n))
 
-    c.header('Cache-Control', 'no-store')
-    return c.json({
+    const body = {
       hostName: nameOf.get(r.hostId) ?? null,
       hostColor: colorOf(r.hostId),
       merchant: (r.merchant ?? 'A bill').slice(0, 80),
@@ -86,6 +92,10 @@ export function registerPublicRoutes(app: Hono<AppContext>): void {
         claimers: claimers(l.recordId),
       })),
       pickers: pickers.slice(0, 3),
-    })
+    }
+    if (cache.size >= CACHE_MAX) cache.clear()
+    cache.set(id, { at: Date.now(), body })
+    c.header('Cache-Control', 'no-store')
+    return c.json(body)
   })
 }

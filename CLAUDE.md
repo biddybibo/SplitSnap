@@ -53,6 +53,10 @@ Full spec: `PLAN.md`. Read it before starting any new slice of work.
 - `addGuest` / `removeGuest` / `setGuestPaid`: host-only. Picking for a guest is `assignItem` with
   `guest:<guestId>` (no separate claimForGuest); it writes `guestClaims`. The only writers of `guests` / `guestClaims`.
 - Client screens read people and claims through `useTable()` (participants + guests, claims + guestClaims).
+- Every host-only action starts with `requireHost()` (`src/server/bill-access.ts`): the single place that checks the
+  caller is the bill's host (from `bills.hostId`, never params) and that the bill isn't locked.
+- Screens derive the reconcile check, claim display and shares from `billMath()` (`src/lib/billMath.ts`), never
+  their own copies. Bill ids: `isBillId` / `BILL_ID_PATTERN` (`src/shared/ids.ts`).
 
 ## Design decisions from the "gaps" boards (2026-10-02)
 - `assignItem` (host-only): writes claims on behalf of people already at the table ("Who had it?", "Split with

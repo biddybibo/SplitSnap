@@ -6,10 +6,8 @@
 import { Link } from 'react-router-dom'
 import { useAuth, useQuery } from 'deepspace'
 import { ChevronLeft } from 'lucide-react'
-import { claimsByLine } from '@/lib/claims'
-import { computeShares } from '@/lib/computeShares'
+import { billMath } from '@/lib/billMath'
 import { formatCents } from '@/lib/money'
-import { reconcile } from '@/lib/reconcile'
 import { Avatar } from './Table'
 import { useTable } from './useTable'
 import type { Item, ReceiptRow } from './types'
@@ -23,26 +21,9 @@ export function SplitPreview({ billId }: { billId: string }) {
   const people = table.people
   if (!receipt) return <p className="px-5 py-10 text-center text-muted-foreground">Loading…</p>
 
-  const lines = items
-    .filter((i) => i.data.kind === 'item' || i.data.kind === 'discount')
-    .map((i) => ({ id: i.recordId, priceCents: i.data.priceCents, name: i.data.name }))
-  const byLine = claimsByLine(lines, claims)
+  const { check, claimable: lines, byLine, shares } = billMath(items, receipt, claims)
   const unclaimed = lines.filter((l) => byLine.get(l.id)!.claimantIds.length === 0)
-  const check = reconcile(
-    items.map((i) => ({ kind: i.data.kind, priceCents: i.data.priceCents })),
-    {
-      printedSubtotalCents: receipt.printedSubtotalCents ?? null,
-      printedTotalCents: receipt.printedTotalCents,
-      printedTipCents: receipt.printedTipCents ?? 0,
-      chargedCents: receipt.chargedCents ?? null,
-    },
-  )
   const extrasCents = check.grandTotalCents - check.claimableCents
-  const shares = computeShares(
-    items.map((i) => ({ id: i.recordId, kind: i.data.kind, priceCents: i.data.priceCents })),
-    claims.map((c) => ({ itemId: c.itemId, userId: c.userId, units: c.units ?? null })),
-    receipt.hostId,
-  )
   const shareOf = (id: string) => shares.find((s) => s.userId === id)
   const assignedCents = shares.reduce((s, x) => s + x.totalCents, 0)
 

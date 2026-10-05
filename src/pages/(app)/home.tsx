@@ -11,6 +11,7 @@ import { Camera } from 'lucide-react'
 import { ScanningScreen, type ScanStage } from '@/components/scan/ScanningScreen'
 import { Button } from '@/components/ui'
 import { callAction } from '@/lib/actions'
+import { parsePrintedAt, shortDay } from '@/lib/dates'
 import { resizeToJpegBase64 } from '@/lib/image'
 import { takeReturnPath } from '@/lib/returnTo'
 import { cn } from '@/lib/utils'
@@ -192,15 +193,6 @@ function ScanReceipt() {
   )
 }
 
-function billDate(printedAt: string | undefined, createdAt: string): string {
-  const raw = printedAt ? (printedAt.length === 10 ? `${printedAt}T00:00` : printedAt) : createdAt
-  const d = new Date(raw)
-  if (Number.isNaN(d.getTime())) return ''
-  const today = new Date()
-  if (d.toDateString() === today.toDateString()) return 'Today'
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
 function MyBills() {
   const { userId } = useAuth()
   const { records, status } = useQuery<Bill>('bills', { orderBy: 'createdAt', orderDir: 'desc', limit: 20 })
@@ -233,7 +225,7 @@ function MyBills() {
                 <span className="flex min-w-0 flex-col gap-0.5">
                   <span className="truncate font-semibold">{bill.data.title || 'Untitled bill'}</span>
                   <span className="text-[13px] text-muted-foreground">
-                    {[billDate(bill.data.printedAt, bill.createdAt), `${people} ${people === 1 ? 'person' : 'people'}`]
+                    {[shortDay(parsePrintedAt(bill.data.printedAt) ?? parsePrintedAt(bill.createdAt)), `${people} ${people === 1 ? 'person' : 'people'}`]
                       .filter(Boolean)
                       .join(' · ')}
                   </span>

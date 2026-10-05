@@ -147,3 +147,13 @@ says that too. **Verified** lines are my own notes from testing.
 - **Agent built:** add / remove guests, pick for a guest from the split sheet, mark a guest paid.
 - **Tested live:** guests + lock end to end matched hand math (Felix $6.54, Gina $7.63, Hana $16.35 = $30.52).
 - **Verified:** _[your notes]_
+
+## 2026-10-04 — Refactor pass before the demo
+- **Direction:** I asked for refactors and a scaling review; chose the low-risk set and kept the data-model
+  changes (per-user rooms, app-wide AI budget, rate limits) for the writeup's "How it scales".
+- **Agent built:** `requireHost()` — one audited host/lock check for all six host-only actions (same error
+  messages); `billMath()` — one pure function for reconcile + claim display + shares used by every screen (tests);
+  shared `isBillId` (client checks now stricter), `dates.ts` (tests; date-only receipts no longer shift a day),
+  shared avatar hash for app + public route; one photo download on Review instead of two; invite sheet + QR library
+  lazy-loaded (33 KB split out); join screen polls only while visible; public preview answers from a 5 s cache.
+- **Verified:** _[your notes]_

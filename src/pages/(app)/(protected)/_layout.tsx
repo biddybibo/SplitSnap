@@ -19,6 +19,7 @@ import { AuthGate, AuthOverlay } from 'deepspace'
 import { Button } from '@/components/ui'
 import { JoinPreview } from '@/components/bill/JoinPreview'
 import { rememberReturnPath } from '@/lib/returnTo'
+import { BILL_ID_PATTERN } from '@/shared/ids'
 
 export default function ProtectedLayout() {
   return (
@@ -32,7 +33,7 @@ function SignedOutPanel() {
   const [showAuthModal, setShowAuthModal] = useState(false)
   const { pathname } = useLocation()
   // A shared bill link gets the "you've been invited" preview instead of a generic sign-in wall.
-  const billMatch = /^\/b\/([0-9a-f-]{36})$/.exec(pathname)
+  const billMatch = new RegExp(`^/b/(${BILL_ID_PATTERN})$`).exec(pathname)
   if (billMatch) return <JoinPreview billId={billMatch[1]} path={pathname} />
 
   return (

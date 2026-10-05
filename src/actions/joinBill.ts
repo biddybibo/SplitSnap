@@ -11,6 +11,7 @@
 
 import type { ActionHandler, ActionTools } from 'deepspace/worker'
 import { createActionTools } from '../server/action-tools'
+import { isBillId } from '../shared/ids'
 import type { Env } from '../../worker'
 
 type BillRow = {
@@ -26,9 +27,7 @@ async function getBill(tools: ActionTools, billId: string): Promise<BillRow | nu
 
 export const joinBill: ActionHandler<Env> = async ({ userId, params, tools, env, callerJwt }) => {
   const { billId, displayName } = params
-  if (typeof billId !== 'string' || !/^[0-9a-f-]{36}$/.test(billId)) {
-    return { success: false, error: 'Invalid bill' }
-  }
+  if (!isBillId(billId)) return { success: false, error: 'Invalid bill' }
   const name = typeof displayName === 'string' ? displayName.trim() : ''
   if (name.length === 0 || name.length > 40) {
     return { success: false, error: 'Name must be 1–40 characters' }
