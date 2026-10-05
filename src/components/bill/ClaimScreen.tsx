@@ -8,7 +8,7 @@
  * (uniqueOn), so the UI can't claim for anyone else even if it tried.
  */
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth, useMutations, usePresenceRoom, useQuery } from 'deepspace'
 import { Pencil, SplitSquareHorizontal } from 'lucide-react'
@@ -41,6 +41,12 @@ export function ClaimScreen({ billId }: { billId: string }) {
   const [confirmLock, setConfirmLock] = useState(false)
   const [locking, setLocking] = useState(false)
   const [splitLineId, setSplitLineId] = useState<string | null>(null)
+  // The host's first share can land here *before* `?invite=1` is added (the live "you're seated" update
+  // beats the action's reply), so react to the param arriving, not just to how the screen first mounted.
+  const inviteParam = params.get('invite') === '1'
+  useEffect(() => {
+    if (inviteParam) setInviteOpen(true)
+  }, [inviteParam])
   const closeInvite = useCallback(() => {
     setInviteOpen(false)
     if (params.has('invite')) setParams({}, { replace: true })
