@@ -51,10 +51,17 @@ await host.goto(BASE + '/home')
 await host.getByText('Snap the receipt').waitFor({ timeout: 20000 })
 await host.locator('input[type=file]:not([capture])').setInputFiles(receiptPath)
 log('host: scanning…')
+// Re-running scans the same test receipt, so expect the duplicate prompt; keep both to continue.
 const review = host.getByRole('button', { name: /^Review \d+ items?/ })
-await review.waitFor({ timeout: 60000 })
-log('host: scan done ->', await review.innerText())
-await review.click()
+const keepBoth = host.getByRole('button', { name: /keep both/ })
+await Promise.race([review.waitFor({ timeout: 60000 }), keepBoth.waitFor({ timeout: 60000 })])
+if (await keepBoth.isVisible()) {
+  log('host: scan done -> duplicate detected:', (await host.getByRole('alert').innerText()).replace(/\s+/g, ' ').slice(0, 90))
+  await keepBoth.click()
+} else {
+  log('host: scan done ->', await review.innerText())
+  await review.click()
+}
 await host.waitForURL(/\/b\/[0-9a-f-]{36}/, { timeout: 15000 })
 const billId = host.url().match(/\/b\/([0-9a-f-]{36})/)[1]
 log('bill', billId)
@@ -125,4 +132,9 @@ for (const [who, amount] of Object.entries(expect)) {
   console.log((ok ? 'PASS' : 'FAIL') + ' settle shows ' + who + ' ' + amount)
 }
 console.log((settle.includes('Shares add up to the bill total, $30.52') ? 'PASS' : 'FAIL') + ' shares add up to $30.52')
+
+// 6. Clean up: the host deletes the test bill; it must be gone for everyone.
+log('host: deleteBill ->', JSON.stringify(await actionAs(host, 'deleteBill', { billId })))
+const gone = await host.evaluate(async (id) => (await fetch('/api/public/bills/' + id)).status, billId)
+console.log((gone === 404 ? 'PASS' : 'FAIL') + ' deleted bill is gone (public preview ' + gone + ')')
 await browser.close()

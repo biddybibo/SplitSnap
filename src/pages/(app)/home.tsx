@@ -7,9 +7,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AuthOverlay, useAsyncResource, useAuth, useQuery, useR2Files } from 'deepspace'
-import { Camera } from 'lucide-react'
+import { Camera, Trash2 } from 'lucide-react'
 import { ScanningScreen, type ScanStage } from '@/components/scan/ScanningScreen'
-import { Button } from '@/components/ui'
+import { Button, ConfirmModal, useToast } from '@/components/ui'
 import { callAction } from '@/lib/actions'
 import { parsePrintedAt, shortDay } from '@/lib/dates'
 import { resizeToJpegBase64 } from '@/lib/image'
@@ -29,6 +29,7 @@ interface ParseResult {
   billId: string
   itemCount: number
   check: { offByCents: number }
+  duplicateOf: { billId: string; title: string; printedAt: string; createdAt: string; strength: 'exact' | 'likely' } | null
 }
 
 export default function HomePage() {
@@ -86,7 +87,9 @@ function CameraBadge() {
 
 function ScanReceipt() {
   const navigate = useNavigate()
-  const { uploadBase64 } = useR2Files() // default `self` scope: only the host can read the photo
+  const { uploadBase64, deleteFile } = useR2Files() // default `self` scope: only the host can read the photo
+  const toast = useToast()
+  const [resolvingDuplicate, setResolvingDuplicate] = useState(false)
   const cameraInput = useRef<HTMLInputElement>(null)
   const libraryInput = useRef<HTMLInputElement>(null)
   const [photo, setPhoto] = useState<File | null>(null)
@@ -160,6 +163,22 @@ function ScanReceipt() {
           onReview={() => parse.data && navigate(`/b/${parse.data.billId}`)}
           onRetry={parse.reload}
           onDifferentPhoto={() => libraryInput.current?.click()}
+          duplicate={parse.data?.duplicateOf ?? null}
+          resolvingDuplicate={resolvingDuplicate}
+          onOpenEarlier={async () => {
+            const result = parse.data
+            if (!result?.duplicateOf) return
+            setResolvingDuplicate(true)
+            try {
+              // Drop the copy we just made (and its photo), then go to the original.
+              const del = await callAction<{ imageId: string | null }>('deleteBill', { billId: result.billId })
+              if (del.imageId) await deleteFile(del.imageId).catch(() => {})
+              navigate(`/b/${result.duplicateOf.billId}`)
+            } catch (err) {
+              toast.error("Couldn't remove the duplicate", err instanceof Error ? err.message : undefined)
+              setResolvingDuplicate(false)
+            }
+          }}
         />
       )}
 
@@ -196,16 +215,47 @@ function ScanReceipt() {
 function MyBills() {
   const { userId } = useAuth()
   const { records, status } = useQuery<Bill>('bills', { orderBy: 'createdAt', orderDir: 'desc', limit: 20 })
+  const { deleteFile } = useR2Files()
+  const toast = useToast()
+  const [editing, setEditing] = useState(false)
+  const [toDelete, setToDelete] = useState<{ id: string; title: string } | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   if (status === 'loading') return null
   if (status === 'error') {
     return <p className="text-sm text-muted-foreground">Couldn&apos;t load your bills.</p>
   }
   if (records.length === 0) return null
+  const hostsAny = records.some((b) => b.data.hostId === userId)
+
+  async function confirmDelete() {
+    if (!toDelete) return
+    setDeleting(true)
+    try {
+      const res = await callAction<{ imageId: string | null }>('deleteBill', { billId: toDelete.id })
+      if (res.imageId) await deleteFile(res.imageId).catch(() => {})
+      setToDelete(null)
+    } catch (err) {
+      toast.error("Couldn't delete the bill", err instanceof Error ? err.message : undefined)
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   return (
     <section className="flex flex-col gap-2.5">
-      <h2 className="text-[13px] font-semibold uppercase tracking-[0.6px] text-muted-foreground">Your bills</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-[13px] font-semibold uppercase tracking-[0.6px] text-muted-foreground">Your bills</h2>
+        {hostsAny && (
+          <button
+            type="button"
+            onClick={() => setEditing((e) => !e)}
+            className="h-9 rounded-full px-3 text-[13px] font-semibold text-primary hover:bg-primary-soft"
+          >
+            {editing ? 'Done' : 'Edit'}
+          </button>
+        )}
+      </div>
       <ul className="flex flex-col gap-2.5">
         {records.map((bill) => {
           const people = 1 + (bill.data.participantIds?.length ?? 0)
@@ -216,14 +266,15 @@ function MyBills() {
               ? { label: 'Locked', className: 'bg-muted text-muted-foreground' }
               : { label: 'Settle up', className: 'bg-warning-soft text-warning' }
             : { label: 'Open', className: 'bg-primary-soft text-primary' }
+          const title = bill.data.title || 'Untitled bill'
           return (
-            <li key={bill.recordId}>
+            <li key={bill.recordId} className="flex items-center gap-2">
               <Link
                 to={`/b/${bill.recordId}`}
-                className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3.5 hover:border-input"
+                className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3.5 hover:border-input"
               >
                 <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="truncate font-semibold">{bill.data.title || 'Untitled bill'}</span>
+                  <span className="truncate font-semibold">{title}</span>
                   <span className="text-[13px] text-muted-foreground">
                     {[shortDay(parsePrintedAt(bill.data.printedAt) ?? parsePrintedAt(bill.createdAt)), `${people} ${people === 1 ? 'person' : 'people'}`]
                       .filter(Boolean)
@@ -234,10 +285,29 @@ function MyBills() {
                   {pill.label}
                 </span>
               </Link>
+              {editing && isHost && (
+                <button
+                  type="button"
+                  aria-label={`Delete ${title}`}
+                  onClick={() => setToDelete({ id: bill.recordId, title })}
+                  className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-destructive hover:bg-accent"
+                >
+                  <Trash2 className="size-4" />
+                </button>
+              )}
             </li>
           )
         })}
       </ul>
+      <ConfirmModal
+        open={toDelete !== null}
+        onClose={() => setToDelete(null)}
+        onConfirm={confirmDelete}
+        loading={deleting}
+        title={`Delete ${toDelete?.title ?? 'this bill'}?`}
+        description="Everyone on it loses access, and its items, picks and totals are removed. This can't be undone."
+        confirmText="Delete bill"
+      />
     </section>
   )
 }

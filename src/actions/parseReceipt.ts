@@ -14,6 +14,7 @@ import { createDeepSpaceAI } from 'deepspace/worker'
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import type { ActionTools } from 'deepspace/worker'
+import { cheapMatch, lineMatch, type Candidate, type DuplicateStrength } from '../lib/duplicates'
 import { createActionTools } from '../server/action-tools'
 import { DAILY_PARSE_LIMIT, parsesUsedToday, utcDay } from './usage'
 import type { Env } from '../../worker'
@@ -80,6 +81,71 @@ export function checkReceipt(
     subtotalPlusChargesMatchesTotal: subtotalForTotal + feesCents + r.taxCents + r.tipCents === r.totalCents,
     // What lockBill will require: lines + fees + tax + tip (+ adjustments) = printed total.
     offByCents: r.totalCents - (linesCents + feesCents + r.taxCents + r.tipCents),
+  }
+}
+
+type BillIndexRow = { title?: string; receiptNumber?: string; printedAt?: string; totalCents?: number }
+
+/**
+ * Did the host already scan this receipt? Best effort, after the new bill exists, so the
+ * scan is never wasted: the client offers "open the earlier one" (and deletes the new copy)
+ * or "keep both". Rules and tests: src/lib/duplicates.ts.
+ */
+async function findDuplicate(
+  tools: ActionTools,
+  env: Env,
+  userId: string,
+  callerJwt: string,
+  newBillId: string,
+  parsed: ParsedReceipt,
+): Promise<{ billId: string; strength: DuplicateStrength; title: string; printedAt: string; createdAt: string } | null> {
+  try {
+    const recent = await tools.query<BillIndexRow>('bills', {
+      where: { hostId: userId },
+      orderBy: 'createdAt',
+      orderDir: 'desc',
+      limit: 50,
+    })
+    if (!recent.success) return null
+    const candidates: Candidate[] = recent.data.records
+      .filter((r) => r.recordId !== newBillId)
+      .map((r) => ({
+        billId: r.recordId,
+        merchant: r.data.title ?? '',
+        receiptNumber: r.data.receiptNumber ?? '',
+        printedAt: r.data.printedAt ?? '',
+        totalCents: r.data.totalCents ?? -1,
+        createdAt: r.createdAt,
+      }))
+    const scan = {
+      merchant: parsed.merchant,
+      receiptNumber: parsed.receiptNumber ?? '',
+      printedAt: parsed.printedAt ?? '',
+      totalCents: parsed.totalCents,
+      linePrices: parsed.items.map((i) => i.priceCents),
+    }
+    const { match, needLines } = cheapMatch(scan, candidates)
+    let found = match
+    if (!found && needLines.length > 0) {
+      const withLines = await Promise.all(
+        needLines.slice(0, 5).map(async (c) => {
+          const items = await createActionTools(env, userId, callerJwt, `bill:${c.billId}`).query<{ kind: string; priceCents: number }>(
+            'items',
+            { limit: 200 },
+          )
+          const linePrices = items.success
+            ? items.data.records.filter((i) => i.data.kind === 'item' || i.data.kind === 'discount').map((i) => i.data.priceCents)
+            : []
+          return { ...c, linePrices }
+        }),
+      )
+      found = lineMatch(scan, withLines)
+    }
+    if (!found) return null
+    const c = candidates.find((x) => x.billId === found!.billId)!
+    return { billId: c.billId, strength: found.strength, title: c.merchant, printedAt: c.printedAt, createdAt: c.createdAt }
+  } catch {
+    return null // never fail a successful scan over the duplicate check
   }
 }
 
@@ -206,5 +272,9 @@ export const parseReceipt: ActionHandler<Env> = async ({ userId, params, tools, 
   )
   if (!bill.success) return { success: false, error: 'Could not save the bill; try again' }
 
-  return { success: true, data: { billId, itemCount: parsed.items.length, check: checkReceipt(parsed) } }
+  const duplicateOf = await findDuplicate(tools, env, userId, callerJwt, billId, parsed)
+  return {
+    success: true,
+    data: { billId, itemCount: parsed.items.length, check: checkReceipt(parsed), duplicateOf },
+  }
 }

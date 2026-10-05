@@ -4,8 +4,9 @@
  * a timer; the photo is the user's own, with a scan line over it.
  */
 
-import { Check } from 'lucide-react'
+import { Check, Copy } from 'lucide-react'
 import { Button } from '@/components/ui'
+import { parsePrintedAt, shortDay } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 
 export type ScanStage = 'uploading' | 'reading' | 'checking' | 'ready' | 'error'
@@ -21,6 +22,10 @@ interface Props {
   onReview: () => void
   onRetry: () => void
   onDifferentPhoto: () => void
+  /** Set when this receipt matches a bill the host already scanned. */
+  duplicate?: { title: string; printedAt: string; createdAt: string; strength: 'exact' | 'likely' } | null
+  onOpenEarlier?: () => void
+  resolvingDuplicate?: boolean
 }
 
 const ORDER: ScanStage[] = ['uploading', 'reading', 'checking', 'ready']
@@ -94,7 +99,29 @@ export function ScanningScreen(p: Props) {
       )}
 
       <div className="flex-1" />
-      {p.stage === 'ready' ? (
+      {p.stage === 'ready' && p.duplicate ? (
+        <div className="flex flex-col gap-3 rounded-2xl bg-[#22252C] p-4" role="alert">
+          <p className="flex items-center gap-2 font-semibold">
+            <Copy className="size-4 text-[#8FB0F0]" />
+            {p.duplicate.strength === 'exact' ? 'You already scanned this receipt' : 'This looks like a receipt you scanned'}
+          </p>
+          <p className="text-sm text-[#C9CCD3]">
+            {p.duplicate.title || 'A bill'} ·{' '}
+            {shortDay(parsePrintedAt(p.duplicate.printedAt) ?? parsePrintedAt(p.duplicate.createdAt)) || 'earlier'}
+          </p>
+          <Button size="lg" className="h-[52px] text-base" disabled={p.resolvingDuplicate} onClick={p.onOpenEarlier} autoFocus>
+            {p.resolvingDuplicate ? 'Opening…' : 'Open the earlier bill'}
+          </Button>
+          <button
+            type="button"
+            disabled={p.resolvingDuplicate}
+            onClick={p.onReview}
+            className="h-11 text-sm font-semibold text-[#C9CCD3] hover:text-white"
+          >
+            It&apos;s a different bill — keep both
+          </button>
+        </div>
+      ) : p.stage === 'ready' ? (
         <Button size="lg" className="h-[52px] text-base" onClick={p.onReview} autoFocus>
           Review {p.itemCount ?? ''} {p.itemCount === 1 ? 'item' : 'items'}
         </Button>
