@@ -50,7 +50,9 @@ Full spec: `PLAN.md`. Read it before starting any new slice of work.
   their list (members can't write `bills`). It writes `bills` *as the host* (id read from the bill) so a userBound
   re-stamp can never put a friend in `hostId`, and re-reads to survive two friends joining at once. The host calls
   it on first share to get their own participants row.
-- `addGuest` / `claimForGuest` (stretch): host-only. The only writers of `guests` and `guestClaims`.
+- `addGuest` / `removeGuest` / `setGuestPaid`: host-only. Picking for a guest is `assignItem` with
+  `guest:<guestId>` (no separate claimForGuest); it writes `guestClaims`. The only writers of `guests` / `guestClaims`.
+- Client screens read people and claims through `useTable()` (participants + guests, claims + guestClaims).
 
 ## Design decisions from the "gaps" boards (2026-10-02)
 - `assignItem` (host-only): writes claims on behalf of people already at the table ("Who had it?", "Split with

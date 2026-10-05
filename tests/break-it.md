@@ -177,8 +177,8 @@ check 2, and check 1 if the server stamps instead of refusing) are deleted again
 
 ## Results — 2026-10-04, https://splitsnap.app.space
 
-Run with `node tests/break-it.run.mjs` (test accounts Hana = host, Felix = friend; bill 7ecc03c3…).
-**18 / 18 PASS.**
+Run with `node tests/break-it.run.mjs` (test accounts Hana = host, Felix = friend).
+**18 / 18 PASS** on bill 7ecc03c3…; after guests shipped, **21 / 21 PASS** on bill 4ee122bc… (adds checks 11–13).
 
 | Check | Server's answer |
 |---|---|
@@ -192,6 +192,9 @@ Run with `node tests/break-it.run.mjs` (test accounts Hana = host, Felix = frien
 | 8. Call lockBill | `Only the host can lock the bill` |
 | 9. Call assignItem | `Only the host can assign items` |
 | 10. Call addItem | `Only the host can add lines` |
+| 11. Call addGuest | `Only the host can manage guests` |
+| 12. Write a guest claim | `CREATE DENIED: role=member, collection=guestClaims` |
+| 13. Mark a guest paid | `Only the host can manage guests` |
 | H1. Host sets receipt.lockedAt | `FIELD ERROR: Role 'member' cannot modify field 'lockedAt'` |
 | H2. Host writes a share | `CREATE DENIED: role=member, collection=shares` |
 | H3. Host adds an item without addItem | `CREATE DENIED: role=member, collection=items` |
@@ -201,3 +204,10 @@ Run with `node tests/break-it.run.mjs` (test accounts Hana = host, Felix = frien
 
 The first run reported check 2 as FAIL; that was a bug in the test (it claimed a different item from the one the
 friend already had, which is legitimately allowed), fixed before the run above.
+
+### Guests + lock, end to end (same run)
+
+Hana added guest Gina, assigned the Shake to her and the Cheeseburger to herself (Felix had the Fries), and
+locked. `lockBill` → `{ totalCents: 3052, people: 3 }`. Settle showed **Felix $6.54** ($6.00 + $0.54 tax),
+**Gina $7.63** ($7.00 + $0.63), **Hana $16.35** (the rest), and "Shares add up to the bill total, $30.52" —
+matching computeShares by hand.

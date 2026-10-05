@@ -205,3 +205,13 @@ One entry per session: what I asked for, what the agent produced, what I verifie
   (the live "seated" update switched to the claim screen before `?invite=1` was added); claim screen now reacts to
   the param. Also fixed a bug in my own check 2.
 - Verified / changed: 
+
+## 2026-10-04 — Guests
+- Asked: build host-added guests, then the writeup.
+- Agent produced: `addGuest` / `removeGuest` / `setGuestPaid` (host-only; max 20; removing a guest deletes their
+  picks first); `assignItem` accepts `guest:<id>` and writes `guestClaims` (with units); lockBill passes guest units.
+  `useTable()` merges participants + guests and claims + guestClaims for every screen. Invite sheet: "No phone or
+  won't sign in? Add guest" + Remove; guests labelled in the host panel, split sheet, preview, settle; host can
+  "Mark paid" a guest on Settle. Break-it +3 guest checks. Live run: 21/21 PASS, and guests + lock end to end
+  matched hand math (Felix $6.54, Gina $7.63, Hana $16.35 = $30.52).
+- Verified / changed: 
